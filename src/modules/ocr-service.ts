@@ -1,0 +1,134 @@
+import Tesseract from 'tesseract.js';
+import { Image } from '@nut-tree-fork/nut-js';
+import { MonumentData, MonumentPlace, OCRConfig } from '../types';
+import { Logger } from '../utils/logger';
+
+/**
+ * Service OCR pour analyser les captures d'écran des Grands Monuments
+ */
+export class OCRService {
+  private logger: Logger;
+  private defaultConfig: OCRConfig;
+
+  constructor() {
+    this.logger = new Logger();
+    this.defaultConfig = {
+      language: 'eng',
+      confidence: 75,
+      preprocessing: {
+        contrast: 1.2,
+        brightness: 1.1,
+        blur: 0,
+      },
+    };
+  }
+
+  /**
+   * Analyse une capture d'écran de Grand Monument pour extraire les données
+   */
+  async analyzeMonument(
+    image: Image,
+    config?: OCRConfig
+  ): Promise<MonumentData> {
+    try {
+      this.logger.info('🧠 Analyse OCR en cours...');
+
+      const ocrConfig = { ...this.defaultConfig, ...config };
+
+      // Pour l'instant, on simule l'analyse OCR
+      // TODO: Implémenter la vraie analyse une fois que l'API Image est clarifiée
+      this.logger.debug('OCR simulé - extraction de données de test');
+
+      // Données de test simulées
+      const places: MonumentPlace[] = [
+        { position: 1, cost: 200, return: 280, playerName: 'TestPlayer1' },
+        { position: 2, cost: 180, return: 220, playerName: 'TestPlayer2' },
+        { position: 3, cost: 150, return: 170, playerName: 'TestPlayer3' },
+        { position: 4, cost: 300, return: 350, playerName: 'TestPlayer4' },
+        { position: 5, cost: 100, return: 110, playerName: 'TestPlayer5' },
+      ];
+
+      const monumentData: MonumentData = {
+        name: 'Grand Monument de Test',
+        places,
+        timestamp: new Date(),
+      };
+
+      this.logger.success(
+        `✅ ${places.length} places détectées dans le monument`
+      );
+      return monumentData;
+    } catch (error) {
+      this.logger.error("Erreur lors de l'analyse OCR:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Parse le texte OCR pour extraire les informations des places
+   */
+  private parseMonumentText(text: string): MonumentPlace[] {
+    const places: MonumentPlace[] = [];
+    const lines = text.split('\n').filter((line) => line.trim().length > 0);
+
+    this.logger.debug('Texte OCR détecté:');
+    this.logger.debug(text);
+
+    // Regex pour détecter les patterns de places
+    // Format attendu: "1. PlayerName - 250 PF → 300 PF"
+    const placeRegex =
+      /(\d+)\.?\s*(.+?)\s*-?\s*(\d+)\s*PF\s*[→>\-]\s*(\d+)\s*PF/i;
+
+    for (const line of lines) {
+      const match = line.match(placeRegex);
+      if (match) {
+        const [, positionStr, playerName, costStr, returnStr] = match;
+
+        const place: MonumentPlace = {
+          position: parseInt(positionStr, 10),
+          cost: parseInt(costStr, 10),
+          return: parseInt(returnStr, 10),
+          playerName: playerName.trim(),
+        };
+
+        places.push(place);
+        this.logger.debug(
+          `Place détectée: ${place.position} - ${place.playerName} (${place.cost}PF → ${place.return}PF)`
+        );
+      }
+    }
+
+    return places.sort((a, b) => a.position - b.position);
+  }
+
+  /**
+   * Extrait le nom du monument du texte OCR
+   */
+  private extractMonumentName(text: string): string | null {
+    const lines = text.split('\n');
+
+    // Le nom du monument est généralement sur la première ligne ou dans une ligne contenant "Monument"
+    for (const line of lines) {
+      if (line.includes('Monument') || line.includes('Grand')) {
+        return line.trim();
+      }
+    }
+
+    // Fallback: prendre la première ligne non-vide
+    const firstLine = lines.find((line) => line.trim().length > 0);
+    return firstLine?.trim() || null;
+  }
+
+  /**
+   * Préprocessing d'image pour améliorer l'OCR
+   */
+  private async preprocessImage(
+    imageBuffer: Buffer,
+    config: OCRConfig['preprocessing']
+  ): Promise<Buffer> {
+    // TODO: Implémenter le préprocessing avec une librairie comme Sharp
+    // Pour l'instant, on retourne l'image telle quelle
+    this.logger.debug("Préprocessing d'image (TODO: implémenter avec Sharp)");
+    return imageBuffer;
+  }
+}
