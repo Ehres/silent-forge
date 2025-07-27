@@ -2,11 +2,17 @@
   "name": "silent-forge",
   "version": "1.0.0",
   "description": "Un outil invisible pour analyser et tirer parti des opportunités dans les jeux",
-  "main": "dist/index.js",
+  "main": "dist/main.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts",
+    "start": "node dist/main.js",
+    "dev": "ts-node src/main.ts",
+    "calibrate": "ts-node src/calibrate.ts",
+    "example": "ts-node src/example.ts",
+    "test-modules": "ts-node src/test.ts",
+    "test-player": "ts-node src/main.ts test",
+    "calibration": "ts-node src/main.ts calibration",
+    "run-players": "ts-node src/main.ts players",
     "watch": "tsc --watch",
     "test": "jest",
     "lint": "eslint src/**/*.ts",
@@ -21,6 +27,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@types/jimp": "^0.2.28",
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
@@ -32,6 +39,7 @@
   },
   "dependencies": {
     "@nut-tree-fork/nut-js": "^4.0.0",
+    "jimp": "^1.6.0",
     "tesseract.js": "^5.0.0"
   }
 }

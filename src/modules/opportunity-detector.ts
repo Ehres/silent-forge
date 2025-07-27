@@ -41,6 +41,9 @@ export class OpportunityDetector {
           profit,
           profitability,
           monumentName: monumentData.name,
+          recommendedInvestment: place.cost, // Investissement recommandé = coût de la place
+          priority:
+            profitability > 20 ? 'high' : profitability > 10 ? 'medium' : 'low',
         };
 
         opportunities.push(opportunity);

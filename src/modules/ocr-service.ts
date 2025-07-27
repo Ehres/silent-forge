@@ -41,17 +41,48 @@ export class OCRService {
 
       // Données de test simulées
       const places: MonumentPlace[] = [
-        { position: 1, cost: 200, return: 280, playerName: 'TestPlayer1' },
-        { position: 2, cost: 180, return: 220, playerName: 'TestPlayer2' },
-        { position: 3, cost: 150, return: 170, playerName: 'TestPlayer3' },
-        { position: 4, cost: 300, return: 350, playerName: 'TestPlayer4' },
-        { position: 5, cost: 100, return: 110, playerName: 'TestPlayer5' },
+        {
+          position: 1,
+          cost: 200,
+          return: 280,
+          playerName: 'TestPlayer1',
+          isAvailable: true,
+        },
+        {
+          position: 2,
+          cost: 180,
+          return: 220,
+          playerName: 'TestPlayer2',
+          isAvailable: true,
+        },
+        {
+          position: 3,
+          cost: 150,
+          return: 170,
+          playerName: 'TestPlayer3',
+          isAvailable: false,
+        },
+        {
+          position: 4,
+          cost: 300,
+          return: 350,
+          playerName: 'TestPlayer4',
+          isAvailable: true,
+        },
+        {
+          position: 5,
+          cost: 100,
+          return: 110,
+          playerName: 'TestPlayer5',
+          isAvailable: true,
+        },
       ];
 
       const monumentData: MonumentData = {
         name: 'Grand Monument de Test',
         places,
         timestamp: new Date(),
+        hasExistingInvestments: true,
       };
 
       this.logger.success(
@@ -89,6 +120,7 @@ export class OCRService {
           cost: parseInt(costStr, 10),
           return: parseInt(returnStr, 10),
           playerName: playerName.trim(),
+          isAvailable: true, // Par défaut, les places détectées sont disponibles
         };
 
         places.push(place);

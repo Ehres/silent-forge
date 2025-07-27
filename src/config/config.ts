@@ -6,6 +6,8 @@ export interface Config {
   opportunity: {
     minProfit: number; // Profit minimum en PF
     minProfitability: number; // Rentabilité minimum en %
+    maxInvestmentPerMonument: number; // Investissement max par monument
+    maxInvestmentPerPlayer: number; // Investissement max par joueur
   };
 
   // Configuration OCR
@@ -26,6 +28,40 @@ export interface Config {
     saveCaptures: boolean;
   };
 
+  // Configuration des zones d'interface
+  ui: {
+    playersList: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
+    monumentsList: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
+    monumentDetails: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
+    investmentInputs: {
+      startX: number;
+      startY: number;
+      spacing: number;
+    };
+    buttons: {
+      openMonuments: { x: number; y: number };
+      openMonument: { x: number; y: number };
+      closeMonument: { x: number; y: number };
+      validate: { x: number; y: number };
+      back: { x: number; y: number };
+    };
+  };
+
   // Configuration de debug
   debug: {
     saveCaptures: boolean;
@@ -38,6 +74,8 @@ export interface Config {
     humanLikeDelays: boolean;
     minDelay: number;
     maxDelay: number;
+    maxPlayersPerSession: number; // Limite pour éviter la détection
+    delayBetweenPlayers: { min: number; max: number };
   };
 
   // Configuration de logging
@@ -55,6 +93,8 @@ export const defaultConfig: Config = {
   opportunity: {
     minProfit: 50,
     minProfitability: 10,
+    maxInvestmentPerMonument: 1000, // Max 1000 PF par monument
+    maxInvestmentPerPlayer: 5000, // Max 5000 PF par joueur
   },
   ocr: {
     language: 'eng',
@@ -63,12 +103,44 @@ export const defaultConfig: Config = {
   },
   capture: {
     monumentRegion: {
-      x: 100,
-      y: 100,
-      width: 800,
-      height: 600,
+      x: 813, // 837
+      y: 948, // 971
+      width: 24,
+      height: 24,
     },
     saveCaptures: true,
+  },
+  ui: {
+    playersList: {
+      x: 50,
+      y: 100,
+      width: 300,
+      height: 500,
+    },
+    monumentsList: {
+      x: 400,
+      y: 150,
+      width: 600,
+      height: 400,
+    },
+    monumentDetails: {
+      x: 200,
+      y: 200,
+      width: 800,
+      height: 500,
+    },
+    investmentInputs: {
+      startX: 500,
+      startY: 250,
+      spacing: 50, // 50px entre chaque place
+    },
+    buttons: {
+      openMonuments: { x: 400, y: 300 },
+      openMonument: { x: 600, y: 250 },
+      closeMonument: { x: 750, y: 100 },
+      validate: { x: 600, y: 250 },
+      back: { x: 100, y: 100 },
+    },
   },
   debug: {
     saveCaptures: true,
@@ -79,6 +151,8 @@ export const defaultConfig: Config = {
     humanLikeDelays: true,
     minDelay: 100,
     maxDelay: 300,
+    maxPlayersPerSession: 10, // Max 10 joueurs par session
+    delayBetweenPlayers: { min: 3000, max: 8000 }, // 3-8 secondes entre joueurs
   },
   logging: {
     level: 'info',

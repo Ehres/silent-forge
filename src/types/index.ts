@@ -6,6 +6,8 @@ export interface MonumentPlace {
   cost: number; // Coût en PF pour prendre cette place
   return: number; // Retour en PF si on prend cette place
   playerName?: string; // Nom du joueur actuellement à cette place
+  isAvailable: boolean; // Si la place est disponible pour investissement
+  currentInvestment?: number; // Montant actuellement investi (si applicable)
 }
 
 /**
@@ -15,6 +17,8 @@ export interface MonumentData {
   name: string;
   places: MonumentPlace[];
   timestamp: Date;
+  hasExistingInvestments: boolean; // Si le joueur a déjà des investissements
+  totalInvested?: number; // Total des PF déjà investis
 }
 
 /**
@@ -27,6 +31,8 @@ export interface Opportunity {
   profit: number; // return - cost
   profitability: number; // profit / cost (en pourcentage)
   monumentName: string;
+  recommendedInvestment: number; // Montant recommandé à investir
+  priority: 'high' | 'medium' | 'low'; // Priorité d'investissement
 }
 
 /**
@@ -53,4 +59,52 @@ export interface OCRConfig {
     brightness: number;
     blur: number;
   };
+}
+
+/**
+ * Configuration des zones d'interface utilisateur
+ */
+export interface UIRegions {
+  playersList: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  monumentsList: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  monumentDetails: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  investmentInputs: {
+    startX: number;
+    startY: number;
+    spacing: number; // Espacement entre les places
+  };
+  buttons: {
+    openMonuments: { x: number; y: number };
+    openMonument: { x: number; y: number };
+    closeMonument: { x: number; y: number };
+    validate: { x: number; y: number };
+    back: { x: number; y: number };
+  };
+}
+
+/**
+ * Résultat d'un traitement de joueur
+ */
+export interface PlayerProcessingResult {
+  playerName: string;
+  monumentsProcessed: number;
+  totalInvestments: number;
+  totalInvested: number;
+  opportunities: Opportunity[];
+  errors: string[];
 }

@@ -1,4 +1,5 @@
 import { screen, Region, Image } from '@nut-tree-fork/nut-js';
+import Jimp from 'jimp';
 import { CaptureConfig } from '../types';
 import { Logger } from '../utils/logger';
 
@@ -71,15 +72,63 @@ export class ScreenCapture {
       fs.mkdirSync(capturesDir, { recursive: true });
     }
 
-    const filepath = path.join(capturesDir, filename);
+    // Assurer l'extension .png si pas présente
+    const finalFilename = filename.endsWith('.png')
+      ? filename
+      : `${filename}.png`;
+    const filepath = path.join(capturesDir, finalFilename);
 
     try {
-      // Tenter de sauvegarder l'image (méthode à adapter selon l'API)
-      // Pour l'instant, on log juste l'information
-      this.logger.debug(`Tentative de sauvegarde: ${filepath}`);
-      this.logger.info(`Image capturée (sauvegarde à implémenter)`);
+      this.logger.debug(`Sauvegarde de l'image: ${filepath}`);
+      this.logger.debug(
+        `Dimensions: ${image.width}x${image.height}, Channels: ${image.channels}`
+      );
+
+      // Créer une image Jimp à partir du buffer de @nut-tree-fork/nut-js
+      const jimpImage = await this.createJimpFromNutImage(image);
+
+      // Sauvegarder avec Jimp (méthode synchrone)
+      jimpImage.write(filepath);
+      this.logger.success(`📸 Image sauvegardée: ${finalFilename}`);
     } catch (error) {
       this.logger.warn("Impossible de sauvegarder l'image:", error);
     }
+  }
+
+  /**
+   * Convertit une image @nut-tree-fork/nut-js vers Jimp
+   */
+  private async createJimpFromNutImage(nutImage: Image): Promise<any> {
+    const { width, height, data, channels } = nutImage;
+
+    // Créer un buffer RGBA standard (4 channels)
+    const rgbaBuffer = Buffer.alloc(width * height * 4);
+
+    for (let i = 0; i < width * height; i++) {
+      const srcIndex = i * channels;
+      const dstIndex = i * 4;
+
+      if (channels >= 3) {
+        rgbaBuffer[dstIndex] = data[srcIndex]; // R
+        rgbaBuffer[dstIndex + 1] = data[srcIndex + 1]; // G
+        rgbaBuffer[dstIndex + 2] = data[srcIndex + 2]; // B
+        rgbaBuffer[dstIndex + 3] = channels === 4 ? data[srcIndex + 3] : 255; // A
+      } else if (channels === 1) {
+        // Grayscale vers RGBA
+        const gray = data[srcIndex];
+        rgbaBuffer[dstIndex] = gray; // R
+        rgbaBuffer[dstIndex + 1] = gray; // G
+        rgbaBuffer[dstIndex + 2] = gray; // B
+        rgbaBuffer[dstIndex + 3] = 255; // A
+      }
+    }
+
+    // Utiliser la méthode create de Jimp avec un objet de configuration
+    const jimp = await import('jimp');
+    return new jimp.Jimp({
+      data: rgbaBuffer,
+      width,
+      height,
+    });
   }
 }
