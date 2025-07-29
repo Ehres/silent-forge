@@ -44,7 +44,7 @@ export class GameNavigationService {
   }
 
   /**
-   * Workflow principal : traite tous les joueurs et leurs monuments
+   * Workflow principal : traite tous les joueurs et leurs monuments avec pagination
    */
   async processAllPlayers(playerList: string[]): Promise<void> {
     this.logger.info('🚀 Démarrage du traitement de tous les joueurs...');
@@ -52,18 +52,84 @@ export class GameNavigationService {
     this.automationService.start();
 
     try {
-      for (const playerName of playerList) {
+      await this.processPlayersWithPagination(playerList);
+    } finally {
+      this.automationService.stop();
+      this.logger.success('✅ Traitement de tous les joueurs terminé!');
+    }
+  }
+
+  /**
+   * Traite les joueurs en gérant la pagination (5 par 5)
+   */
+  private async processPlayersWithPagination(
+    playerList: string[]
+  ): Promise<void> {
+    const playersPerPage = this.config.ui.pagination.playersPerPage;
+    const maxPages = this.config.ui.pagination.maxPages;
+
+    // Diviser la liste en pages de 5 joueurs
+    const pages: string[][] = [];
+    for (let i = 0; i < playerList.length; i += playersPerPage) {
+      pages.push(playerList.slice(i, i + playersPerPage));
+    }
+
+    // Limiter le nombre de pages pour la sécurité
+    if (pages.length > maxPages) {
+      this.logger.warn(
+        `⚠️ Limitation: ${maxPages} pages max (${maxPages * playersPerPage} joueurs)`
+      );
+      pages.splice(maxPages);
+    }
+
+    this.logger.info(`📄 ${pages.length} page(s) de joueurs à traiter`);
+
+    for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+      const currentPage = pages[pageIndex];
+      this.logger.info(
+        `📄 Traitement de la page ${pageIndex + 1}/${pages.length} (${currentPage.length} joueurs)`
+      );
+
+      // Traiter tous les joueurs de la page actuelle
+      for (const playerName of currentPage) {
         this.logger.info(`👤 Traitement du joueur: ${playerName}`);
         await this.processPlayer(playerName);
 
         // Délai entre joueurs pour paraître humain
         await this.automationService.randomDelay(2000, 4000);
       }
-    } finally {
-      this.automationService.stop();
-    }
 
-    this.logger.success('✅ Traitement de tous les joueurs terminé!');
+      // Passer à la page suivante si ce n'est pas la dernière
+      if (pageIndex < pages.length - 1) {
+        await this.navigateToNextPlayersPage();
+      }
+    }
+  }
+
+  /**
+   * Navigation vers la page suivante de joueurs
+   */
+  private async navigateToNextPlayersPage(): Promise<void> {
+    this.logger.info('📄 Navigation vers la page suivante de joueurs...');
+
+    try {
+      // Cliquer sur le bouton "Suivant"
+      await this.automationService.humanClick(
+        this.config.ui.buttons.nextPlayers.x,
+        this.config.ui.buttons.nextPlayers.y
+      );
+
+      // Attendre que la nouvelle page se charge
+      await this.automationService.randomDelay(1000, 2000);
+
+      this.logger.debug('✅ Page suivante chargée');
+    } catch (error) {
+      this.logger.error(
+        '❌ Erreur lors de la navigation vers la page suivante:',
+        error
+      );
+      throw error;
+    }
   }
 
   /**

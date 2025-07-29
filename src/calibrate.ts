@@ -14,12 +14,30 @@ class CalibrationHelper {
   }
 
   /**
+   * Compte à rebours avant capture
+   */
+  private async countdown(seconds: number = 5): Promise<void> {
+    this.logger.info(`⏳ Préparation... Capture dans ${seconds} secondes`);
+    this.logger.info('🎮 Préparez votre écran de jeu maintenant!');
+
+    for (let i = seconds; i > 0; i--) {
+      this.logger.info(`⏰ ${i}...`);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    this.logger.info('📸 Capture en cours!');
+  }
+
+  /**
    * Capture l'écran complet pour identifier les zones d'intérêt
    */
   async captureFullScreen(): Promise<void> {
     this.logger.info("📸 Capture d'écran complète pour calibration...");
 
     try {
+      // Compte à rebours avant capture
+      await this.countdown();
+
       const screenshot = await this.screenCapture.captureScreen();
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
@@ -48,13 +66,34 @@ class CalibrationHelper {
     width: number,
     height: number
   ): Promise<void> {
+    // Validation des paramètres
+    const minSize = 50; // Taille minimale pour éviter les crashes
+    const adjustedWidth = Math.max(width, minSize);
+    const adjustedHeight = Math.max(height, minSize);
+
+    if (width < minSize || height < minSize) {
+      this.logger.warn(
+        `⚠️ Région trop petite (${width}x${height}), ajustée à ${adjustedWidth}x${adjustedHeight}`
+      );
+      this.logger.info('💡 Taille minimale recommandée: 50x50 pixels');
+    }
+
+    // Validation des coordonnées
+    if (x < 0 || y < 0) {
+      this.logger.error('❌ Les coordonnées ne peuvent pas être négatives');
+      return;
+    }
+
     this.logger.info(
-      `📸 Test de capture région: (${x}, ${y}, ${width}x${height})`
+      `📸 Test de capture région: (${x}, ${y}, ${adjustedWidth}x${adjustedHeight})`
     );
 
     try {
+      // Compte à rebours avant capture
+      await this.countdown(3);
+
       const config = {
-        region: { x, y, width, height },
+        region: { x, y, width: adjustedWidth, height: adjustedHeight },
       };
 
       const screenshot = await this.screenCapture.captureScreen(config);
@@ -62,15 +101,28 @@ class CalibrationHelper {
 
       await this.screenCapture.saveCapture(
         screenshot,
-        `calibration-region-${x}-${y}-${width}x${height}-${timestamp}.png`
+        `calibration-region-${x}-${y}-${adjustedWidth}x${adjustedHeight}-${timestamp}.png`
       );
 
       this.logger.success('✅ Capture de région sauvegardée!');
       this.logger.info(
         '💡 Vérifiez si la zone capturée contient bien les boutons/places'
       );
+
+      if (adjustedWidth !== width || adjustedHeight !== height) {
+        this.logger.info(`📏 Région originale demandée: ${width}x${height}`);
+        this.logger.info(
+          `📏 Région capturée (ajustée): ${adjustedWidth}x${adjustedHeight}`
+        );
+      }
     } catch (error) {
       this.logger.error('❌ Erreur lors de la capture de région:', error);
+      this.logger.info('💡 Suggestions:');
+      this.logger.info(
+        "   • Vérifiez que les coordonnées sont dans les limites de l'écran"
+      );
+      this.logger.info('   • Utilisez une taille plus grande (minimum 50x50)');
+      this.logger.info("   • Testez d'abord avec: npm run calibrate -- full");
     }
   }
 
@@ -79,6 +131,12 @@ class CalibrationHelper {
    */
   async captureSequence(): Promise<void> {
     this.logger.info('📸 Séquence de captures pour calibration...');
+    this.logger.info(
+      '🎮 Assurez-vous que votre jeu est ouvert et positionné correctement'
+    );
+
+    // Compte à rebours initial
+    await this.countdown();
 
     const testRegions = [
       { x: 100, y: 100, width: 800, height: 600, name: 'default' },
@@ -86,17 +144,36 @@ class CalibrationHelper {
       { x: 50, y: 50, width: 1000, height: 700, name: 'large' },
     ];
 
-    for (const region of testRegions) {
-      this.logger.info(`📸 Test région ${region.name}...`);
-      await this.testRegionCapture(
-        region.x,
-        region.y,
-        region.width,
-        region.height
+    for (let i = 0; i < testRegions.length; i++) {
+      const region = testRegions[i];
+      this.logger.info(
+        `📸 Test région ${region.name} (${i + 1}/${testRegions.length})...`
       );
 
-      // Délai entre captures
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      if (i > 0) {
+        // Délai plus court entre captures de la séquence
+        this.logger.info('⏳ Capture dans 2 secondes...');
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+
+      const config = {
+        region: {
+          x: region.x,
+          y: region.y,
+          width: region.width,
+          height: region.height,
+        },
+      };
+
+      const screenshot = await this.screenCapture.captureScreen(config);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+      await this.screenCapture.saveCapture(
+        screenshot,
+        `calibration-${region.name}-${region.x}-${region.y}-${region.width}x${region.height}-${timestamp}.png`
+      );
+
+      this.logger.success(`✅ Capture ${region.name} sauvegardée!`);
     }
 
     this.logger.success('✅ Séquence de calibration terminée!');
@@ -113,8 +190,14 @@ class CalibrationHelper {
     this.logger.info('   • Ouvrez votre jeu');
     this.logger.info('   • Naviguez vers un Grand Monument');
     this.logger.info('   • Assurez-vous que les places/boutons sont visibles');
+    this.logger.info(
+      '   • Positionnez la fenêtre du jeu comme vous le souhaitez'
+    );
     this.logger.info('');
     this.logger.info('📸 ÉTAPE 2: Capture de référence');
+    this.logger.info(
+      '🚨 IMPORTANT: Ne bougez plus la fenêtre après le début du compte à rebours!'
+    );
 
     await this.captureFullScreen();
 
@@ -148,8 +231,16 @@ async function main(): Promise<void> {
     case 'region':
       const x = parseInt(args[1]) || 100;
       const y = parseInt(args[2]) || 100;
-      const width = parseInt(args[3]) || 800;
-      const height = parseInt(args[4]) || 600;
+      const width = parseInt(args[3]) || 200; // Taille par défaut plus grande
+      const height = parseInt(args[4]) || 200; // Taille par défaut plus grande
+
+      if (isNaN(x) || isNaN(y) || isNaN(width) || isNaN(height)) {
+        console.log('❌ Erreur: Coordonnées invalides');
+        console.log('💡 Usage: npm run calibrate -- region x y width height');
+        console.log('📋 Exemple: npm run calibrate -- region 813 948 200 200');
+        return;
+      }
+
       await calibrator.testRegionCapture(x, y, width, height);
       break;
 
@@ -167,6 +258,44 @@ async function main(): Promise<void> {
         config.capture.monumentRegion.width,
         config.capture.monumentRegion.height
       );
+      break;
+
+    case 'help':
+      console.log('📋 Commandes disponibles:');
+      console.log(
+        '  npm run calibrate                    # Guide interactif (défaut)'
+      );
+      console.log(
+        '  npm run calibrate -- full           # Capture plein écran'
+      );
+      console.log(
+        '  npm run calibrate -- region x y w h # Capture région spécifique'
+      );
+      console.log(
+        '  npm run calibrate -- sequence       # Capture plusieurs régions'
+      );
+      console.log(
+        '  npm run calibrate -- test           # Test config actuelle'
+      );
+      console.log('  npm run calibrate -- help           # Affiche cette aide');
+      console.log('');
+      console.log('💡 Exemples:');
+      console.log(
+        '  npm run calibrate -- region 813 948 200 200  # Capture bouton'
+      );
+      console.log(
+        '  npm run calibrate -- region 100 100 800 600  # Grande zone'
+      );
+      console.log(
+        '  npm run calibrate -- test                    # Test config'
+      );
+      console.log('');
+      console.log('⚠️ Notes importantes:');
+      console.log(
+        '  • Taille minimale: 50x50 pixels (auto-ajustée si plus petite)'
+      );
+      console.log('  • Les coordonnées doivent être positives');
+      console.log("  • Vérifiez que la région est dans les limites de l'écran");
       break;
 
     case 'interactive':

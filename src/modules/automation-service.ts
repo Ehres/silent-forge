@@ -85,7 +85,7 @@ export class AutomationService {
         currentPos.y + (targetY - currentPos.y) * bezierProgress + randomY;
 
       await mouse.setPosition(new Point(Math.round(x), Math.round(y)));
-      await this.randomDelay(10, 30);
+      await this.randomDelay(200, 1000);
     }
 
     // S'assurer d'arriver exactement à la cible
@@ -117,7 +117,7 @@ export class AutomationService {
 
     for (const char of text) {
       await keyboard.type(char);
-      await this.randomDelay(50, 150);
+      await this.randomDelay(300, 1200);
     }
   }
 

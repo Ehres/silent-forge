@@ -53,12 +53,18 @@ export interface Config {
       startY: number;
       spacing: number;
     };
+    pagination: {
+      playersPerPage: number; // Nombre de joueurs par page
+      maxPages: number; // Limite de pages à parcourir (sécurité)
+    };
     buttons: {
       openMonuments: { x: number; y: number };
       openMonument: { x: number; y: number };
       closeMonument: { x: number; y: number };
       validate: { x: number; y: number };
       back: { x: number; y: number };
+      nextPlayers: { x: number; y: number };
+      previousPlayers: { x: number; y: number };
     };
   };
 
@@ -103,14 +109,15 @@ export const defaultConfig: Config = {
   },
   capture: {
     monumentRegion: {
-      x: 813, // 837
-      y: 948, // 971
+      x: 813,
+      y: 948,
       width: 24,
       height: 24,
     },
     saveCaptures: true,
   },
   ui: {
+    // @TODO: maybe need to remove player list
     playersList: {
       x: 50,
       y: 100,
@@ -118,10 +125,10 @@ export const defaultConfig: Config = {
       height: 500,
     },
     monumentsList: {
-      x: 400,
-      y: 150,
-      width: 600,
-      height: 400,
+      x: 813,
+      y: 948,
+      width: 24,
+      height: 24,
     },
     monumentDetails: {
       x: 200,
@@ -134,12 +141,18 @@ export const defaultConfig: Config = {
       startY: 250,
       spacing: 50, // 50px entre chaque place
     },
+    pagination: {
+      playersPerPage: 5, // 5 joueurs par page
+      maxPages: 20, // Maximum 20 pages (100 joueurs) par sécurité
+    },
     buttons: {
-      openMonuments: { x: 400, y: 300 },
+      openMonuments: { x: 813, y: 948 },
       openMonument: { x: 600, y: 250 },
       closeMonument: { x: 750, y: 100 },
       validate: { x: 600, y: 250 },
       back: { x: 100, y: 100 },
+      nextPlayers: { x: 650, y: 550 }, // Bouton "Suivant" pour la pagination des joueurs
+      previousPlayers: { x: 150, y: 550 }, // Bouton "Précédent" pour revenir en arrière
     },
   },
   debug: {
