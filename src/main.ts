@@ -23,12 +23,26 @@ class SilentForgeMain {
     this.logger.info('🚀 Démarrage de Silent Forge - Workflow complet...');
 
     try {
-      // Liste de joueurs par défaut pour les tests
-      const playersToProcess = playerList || [
-        'TestPlayer1',
-        'TestPlayer2',
-        'TestPlayer3',
-      ];
+      let playersToProcess: string[];
+
+      if (playerList && playerList.length > 0) {
+        // Utiliser la liste fournie en paramètre
+        playersToProcess = playerList;
+        this.logger.info(
+          `👥 Utilisation de la liste fournie: ${playersToProcess.length} joueur(s)`
+        );
+      } else if (this.config.players.scanAllPlayers) {
+        // Scanner tous les joueurs avec filtrage
+        this.logger.info('🔍 Récupération automatique de tous les joueurs...');
+        playersToProcess =
+          await this.gameNavigationService.getAllPlayersFiltered();
+      } else {
+        // Mode test avec joueurs par défaut
+        playersToProcess = ['TestPlayer1', 'TestPlayer2', 'TestPlayer3'];
+        this.logger.info(
+          `🧪 Mode test avec ${playersToProcess.length} joueur(s) par défaut`
+        );
+      }
 
       this.logger.info(`👥 ${playersToProcess.length} joueur(s) à traiter`);
       this.logger.info('📋 Workflow:');
@@ -112,6 +126,12 @@ async function main(): Promise<void> {
       // Mode avec liste de joueurs spécifique
       const customPlayers = args.slice(1);
       await silentForge.start(customPlayers);
+      break;
+
+    case 'scan':
+      // Mode scan automatique de tous les joueurs
+      console.log('🔍 Mode scan automatique activé');
+      await silentForge.start(); // Sans paramètres = utilise le scan automatique
       break;
 
     case 'normal':

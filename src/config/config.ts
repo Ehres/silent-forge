@@ -84,6 +84,12 @@ export interface Config {
     delayBetweenPlayers: { min: number; max: number };
   };
 
+  // Configuration des joueurs
+  players: {
+    excludeList: string[]; // Liste des joueurs à exclure
+    scanAllPlayers: boolean; // Si true, parcourt tous les joueurs disponibles
+  };
+
   // Configuration de logging
   logging: {
     level: 'debug' | 'info' | 'warn' | 'error';
@@ -166,6 +172,14 @@ export const defaultConfig: Config = {
     maxDelay: 300,
     maxPlayersPerSession: 10, // Max 10 joueurs par session
     delayBetweenPlayers: { min: 3000, max: 8000 }, // 3-8 secondes entre joueurs
+  },
+  players: {
+    excludeList: [
+      // Exemples de joueurs à exclure
+      // 'JoueurAEviter1',
+      // 'JoueurAEviter2',
+    ],
+    scanAllPlayers: true, // Parcourt tous les joueurs disponibles
   },
   logging: {
     level: 'info',

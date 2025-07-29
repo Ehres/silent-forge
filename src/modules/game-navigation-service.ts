@@ -44,6 +44,157 @@ export class GameNavigationService {
   }
 
   /**
+   * Récupère la liste complète des joueurs disponibles avec filtrage
+   */
+  async getAllPlayersFiltered(): Promise<string[]> {
+    this.logger.info('🔍 Récupération de la liste complète des joueurs...');
+
+    try {
+      // Naviguer vers la liste des joueurs si nécessaire
+      await this.navigateToPlayersList();
+
+      // Récupérer tous les joueurs de toutes les pages
+      const allPlayers = await this.scanAllPlayersFromAllPages();
+
+      // Appliquer la liste d'exclusion
+      const excludeList = this.config.players.excludeList || [];
+      const filteredPlayers = allPlayers.filter(
+        (player) => !excludeList.includes(player)
+      );
+
+      this.logger.info(
+        `👥 ${allPlayers.length} joueur(s) trouvé(s), ${filteredPlayers.length} après filtrage`
+      );
+
+      if (excludeList.length > 0) {
+        this.logger.info(`🚫 Joueurs exclus: ${excludeList.join(', ')}`);
+      }
+
+      return filteredPlayers;
+    } catch (error) {
+      this.logger.error(
+        '❌ Erreur lors de la récupération des joueurs:',
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Navigue vers la liste des joueurs (première page)
+   */
+  private async navigateToPlayersList(): Promise<void> {
+    this.logger.debug('🔍 Navigation vers la liste des joueurs...');
+
+    // TODO: Implémenter la navigation vers la liste des joueurs
+    // Cela dépend de l'interface du jeu
+    await this.automationService.randomDelay(1000, 2000);
+
+    this.logger.debug('✅ Navigation vers la liste des joueurs terminée');
+  }
+
+  /**
+   * Scanne tous les joueurs de toutes les pages disponibles
+   */
+  private async scanAllPlayersFromAllPages(): Promise<string[]> {
+    const allPlayers: string[] = [];
+    const maxPages = this.config.ui.pagination.maxPages;
+    let currentPage = 1;
+    let hasMorePages = true;
+
+    this.logger.info('📄 Scan de toutes les pages de joueurs...');
+
+    while (hasMorePages && currentPage <= maxPages) {
+      this.logger.info(`📄 Scan de la page ${currentPage}...`);
+
+      // Capturer et analyser la page actuelle
+      const playersOnPage = await this.extractPlayersFromCurrentPage();
+
+      if (playersOnPage.length === 0) {
+        this.logger.info('📄 Aucun joueur trouvé sur cette page - fin du scan');
+        hasMorePages = false;
+        break;
+      }
+
+      allPlayers.push(...playersOnPage);
+      this.logger.info(
+        `📄 ${playersOnPage.length} joueur(s) trouvé(s) sur la page ${currentPage}`
+      );
+
+      // Vérifier s'il y a une page suivante
+      if (currentPage < maxPages) {
+        hasMorePages = await this.navigateToNextPlayersPageIfExists();
+        if (hasMorePages) {
+          currentPage++;
+          await this.automationService.randomDelay(1000, 2000);
+        }
+      } else {
+        hasMorePages = false;
+      }
+    }
+
+    this.logger.success(
+      `✅ Scan terminé: ${allPlayers.length} joueur(s) trouvé(s) sur ${currentPage} page(s)`
+    );
+    return allPlayers;
+  }
+
+  /**
+   * Extrait la liste des joueurs de la page actuellement affichée
+   */
+  private async extractPlayersFromCurrentPage(): Promise<string[]> {
+    try {
+      // Capturer la zone de la liste des joueurs
+      const screenshot = await this.screenCapture.captureScreen({
+        region: this.config.ui.playersList,
+      });
+
+      // Sauvegarder pour debug si activé
+      if (this.config.debug.saveCaptures) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `players_list_page_${timestamp}`;
+        await this.screenCapture.saveCapture(screenshot, filename);
+      }
+
+      // TODO: Utiliser OCR pour extraire les noms des joueurs
+      // Pour l'instant, retourner une liste simulée
+      const simulatedPlayers = [
+        `SimulatedPlayer${Math.floor(Math.random() * 1000)}`,
+        `SimulatedPlayer${Math.floor(Math.random() * 1000)}`,
+        `SimulatedPlayer${Math.floor(Math.random() * 1000)}`,
+        `SimulatedPlayer${Math.floor(Math.random() * 1000)}`,
+        `SimulatedPlayer${Math.floor(Math.random() * 1000)}`,
+      ];
+
+      return simulatedPlayers;
+    } catch (error) {
+      this.logger.error("❌ Erreur lors de l'extraction des joueurs:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Navigue vers la page suivante de joueurs si elle existe
+   */
+  private async navigateToNextPlayersPageIfExists(): Promise<boolean> {
+    try {
+      // TODO: Vérifier si le bouton "Suivant" est disponible/cliquable
+      // Pour l'instant, simuler la navigation
+
+      await this.automationService.humanClick(
+        this.config.ui.buttons.nextPlayers.x,
+        this.config.ui.buttons.nextPlayers.y
+      );
+
+      await this.automationService.randomDelay(1000, 2000);
+      return true; // Simuler qu'il y a toujours une page suivante pour les tests
+    } catch (error) {
+      this.logger.debug('📄 Pas de page suivante disponible');
+      return false;
+    }
+  }
+
+  /**
    * Workflow principal : traite tous les joueurs et leurs monuments avec pagination
    */
   async processAllPlayers(playerList: string[]): Promise<void> {
