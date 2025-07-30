@@ -179,7 +179,7 @@ export const defaultConfig: Config = {
       // 'JoueurAEviter1',
       // 'JoueurAEviter2',
     ],
-    scanAllPlayers: true, // Parcourt tous les joueurs disponibles
+    scanAllPlayers: false, // Mode séquentiel par défaut (plus fiable)
   },
   logging: {
     level: 'info',

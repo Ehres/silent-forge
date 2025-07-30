@@ -88,7 +88,7 @@ export class GameNavigationService {
 
     // TODO: Implémenter la navigation vers la liste des joueurs
     // Cela dépend de l'interface du jeu
-    await this.automationService.randomDelay(1000, 2000);
+    await this.automationService.randomDelay(10, 1000);
 
     this.logger.debug('✅ Navigation vers la liste des joueurs terminée');
   }
@@ -195,10 +195,77 @@ export class GameNavigationService {
   }
 
   /**
-   * Workflow principal : traite tous les joueurs et leurs monuments avec pagination
+   * Workflow principal : traite tous les joueurs de manière séquentielle
+   * Mode aveugle - sans connaître les noms à l'avance
+   */
+  async processAllPlayersSequential(): Promise<void> {
+    this.logger.info(
+      '🚀 Démarrage du traitement séquentiel de tous les joueurs...'
+    );
+    this.logger.info('🔄 Mode aveugle - traitement par position relative');
+
+    this.automationService.start();
+
+    try {
+      let totalPlayersProcessed = 0;
+      let currentPage = 1;
+      const maxPages = this.config.ui.pagination.maxPages;
+      const playersPerPage = this.config.ui.pagination.playersPerPage;
+
+      // Naviguer vers la première page des joueurs
+      await this.navigateToPlayersList();
+
+      while (currentPage <= maxPages) {
+        this.logger.info(`📄 Traitement de la page ${currentPage}...`);
+
+        // Traiter tous les joueurs de la page actuelle
+        const playersProcessedOnPage = await this.processPlayersOnCurrentPage();
+
+        if (playersProcessedOnPage === 0) {
+          this.logger.info(
+            '📄 Aucun joueur trouvé sur cette page - fin du traitement'
+          );
+          break;
+        }
+
+        totalPlayersProcessed += playersProcessedOnPage;
+        this.logger.info(
+          `📊 Page ${currentPage}: ${playersProcessedOnPage} joueur(s) traité(s)`
+        );
+
+        // Vérifier la limitation de session
+        const maxPlayersPerSession =
+          this.config.automation.maxPlayersPerSession;
+        if (totalPlayersProcessed >= maxPlayersPerSession) {
+          this.logger.warn(
+            `⚠️ Limite de session atteinte: ${maxPlayersPerSession} joueurs`
+          );
+          break;
+        }
+
+        // Essayer de passer à la page suivante
+        const hasNextPage = await this.navigateToNextPlayersPageIfExists();
+        if (!hasNextPage) {
+          this.logger.info('� Plus de pages disponibles');
+          break;
+        }
+
+        currentPage++;
+      }
+
+      this.logger.success(
+        `✅ Traitement terminé: ${totalPlayersProcessed} joueur(s) sur ${currentPage} page(s)`
+      );
+    } finally {
+      this.automationService.stop();
+    }
+  }
+
+  /**
+   * Workflow avec liste de joueurs prédéfinie (méthode originale)
    */
   async processAllPlayers(playerList: string[]): Promise<void> {
-    this.logger.info('🚀 Démarrage du traitement de tous les joueurs...');
+    this.logger.info('🚀 Démarrage du traitement avec liste prédéfinie...');
 
     this.automationService.start();
 
@@ -207,6 +274,124 @@ export class GameNavigationService {
     } finally {
       this.automationService.stop();
       this.logger.success('✅ Traitement de tous les joueurs terminé!');
+    }
+  }
+
+  /**
+   * Traite tous les joueurs visibles sur la page actuelle
+   */
+  private async processPlayersOnCurrentPage(): Promise<number> {
+    const playersPerPage = this.config.ui.pagination.playersPerPage;
+    let playersProcessed = 0;
+
+    for (let playerIndex = 0; playerIndex < playersPerPage; playerIndex++) {
+      try {
+        this.logger.info(
+          `👤 Traitement du joueur à la position ${playerIndex + 1}...`
+        );
+
+        // Vérifier si le joueur existe à cette position
+        // @TODO: Implémenter la logique de vérification du joueur
+        // const playerExists = await this.clickOnPlayerAtPosition(playerIndex);
+        // if (!playerExists) {
+        //   this.logger.info(
+        //     `   ℹ️ Pas de joueur à la position ${playerIndex + 1}`
+        //   );
+        //   break; // Fin de la page
+        // }
+
+        // Traiter ce joueur (sans connaître son nom)
+        await this.processCurrentPlayer(playerIndex + 1);
+        playersProcessed++;
+
+        // Délai entre joueurs pour paraître humain
+        await this.automationService.randomDelay(2000, 4000);
+
+        // Retourner à la liste des joueurs pour le suivant
+        await this.returnToPlayersList();
+      } catch (error) {
+        this.logger.error(
+          `❌ Erreur joueur position ${playerIndex + 1}:`,
+          error
+        );
+        // Continuer avec le joueur suivant
+        await this.returnToPlayersList();
+      }
+    }
+
+    return playersProcessed;
+  }
+
+  /**
+   * Clique sur un joueur à une position spécifique dans la liste
+   */
+  private async clickOnPlayerAtPosition(playerIndex: number): Promise<boolean> {
+    try {
+      // Calculer la position Y du joueur basée sur l'index
+      const playersList = this.config.ui.playersList;
+      const playerHeight = 40; // Hauteur approximative d'une ligne de joueur
+      const startY = playersList.y + 20; // Marge du haut
+
+      const playerX = playersList.x + playersList.width / 2; // Centre horizontalement
+      const playerY = startY + playerIndex * playerHeight;
+
+      // Vérifier si la position est dans les limites de la zone des joueurs
+      if (playerY > playersList.y + playersList.height) {
+        return false; // Position en dehors de la zone
+      }
+
+      this.logger.debug(
+        `🖱️ Clic sur joueur position ${playerIndex + 1} (${playerX}, ${playerY})`
+      );
+
+      await this.automationService.humanClick(playerX, playerY);
+      await this.automationService.randomDelay(1000, 2000);
+
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `❌ Erreur clic joueur position ${playerIndex + 1}:`,
+        error
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Traite le joueur actuellement sélectionné (workflow complet)
+   */
+  private async processCurrentPlayer(playerPosition: number): Promise<void> {
+    try {
+      this.logger.info(
+        `🏛️ Ouverture des monuments pour joueur position ${playerPosition}...`
+      );
+
+      // 1. Ouvrir la liste des grands monuments
+      await this.openMonumentsList();
+
+      // 2. Identifier les monuments avec investissements
+      const monuments = await this.identifyInvestedMonuments();
+
+      if (monuments.length === 0) {
+        this.logger.info(
+          `   ℹ️ Aucun monument avec investissement (position ${playerPosition})`
+        );
+        return;
+      }
+
+      this.logger.info(
+        `   🏛️ ${monuments.length} monument(s) avec investissements détecté(s)`
+      );
+
+      // 3. Traiter chaque monument
+      for (const monument of monuments) {
+        await this.processMonument(monument);
+      }
+    } catch (error) {
+      this.logger.error(
+        `❌ Erreur traitement joueur position ${playerPosition}:`,
+        error
+      );
     }
   }
 
