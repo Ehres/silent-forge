@@ -5,6 +5,10 @@ import { OpportunityDetector } from './opportunity-detector';
 import { Logger } from '../utils/logger';
 import { loadConfig } from '../config/config';
 import { MonumentData, Opportunity } from '../types';
+import {
+  getButtonCenterWithRandomOffset,
+  ButtonCoordinates,
+} from '../utils/button-utils';
 
 /**
  * Représente un monument avec investissement
@@ -366,8 +370,8 @@ export class GameNavigationService {
         `🏛️ Ouverture des monuments pour joueur position ${playerPosition}...`
       );
 
-      // 1. Ouvrir la liste des grands monuments
-      await this.openMonumentsList();
+      // 1. Ouvrir la liste des grands monuments (avec position dynamique)
+      await this.openMonumentsList(playerPosition - 1); // playerPosition est 1-based, index est 0-based
 
       // 2. Identifier les monuments avec investissements
       const monuments = await this.identifyInvestedMonuments();
@@ -527,19 +531,89 @@ export class GameNavigationService {
   }
 
   /**
-   * Ouvrir la liste des grands monuments du joueur
+   * Ouvrir la liste des grands monuments du joueur actuellement sélectionné
    */
-  async openMonumentsList(): Promise<void> {
+  async openMonumentsList(playerIndex?: number): Promise<void> {
     this.logger.info('🏛️ Ouverture de la liste des grands monuments...');
 
-    // TODO: Coordonnées du bouton "Grands Monuments" à définir
-    const monumentsButtonX = 400; // À calibrer
-    const monumentsButtonY = 300; // À calibrer
+    let clickCoordinates: { x: number; y: number };
 
-    await this.automationService.humanClick(monumentsButtonX, monumentsButtonY);
+    if (playerIndex !== undefined) {
+      // Mode séquentiel - calculer la position basée sur l'index du joueur
+      const cardLayout = this.calculatePlayerCardPosition(playerIndex);
+
+      const monumentsButton: ButtonCoordinates = {
+        x: cardLayout.monumentsButtonX,
+        y: cardLayout.monumentsButtonY,
+        width: cardLayout.monumentsButtonWidth,
+        height: cardLayout.monumentsButtonHeight,
+      };
+
+      // Cliquer au centre du bouton avec un léger décalage aléatoire
+      clickCoordinates = getButtonCenterWithRandomOffset(monumentsButton);
+
+      this.logger.debug(
+        `🎯 Bouton joueur ${playerIndex + 1}: taille ${monumentsButton.width}x${monumentsButton.height}, centre calculé: (${clickCoordinates.x}, ${clickCoordinates.y})`
+      );
+    } else {
+      // Mode classique - utiliser les coordonnées de la configuration
+      const monumentsButton: ButtonCoordinates =
+        this.config.ui.buttons.openMonuments;
+      clickCoordinates = getButtonCenterWithRandomOffset(monumentsButton);
+
+      this.logger.debug(
+        `🎯 Bouton depuis config: taille ${monumentsButton.width}x${monumentsButton.height}, centre calculé: (${clickCoordinates.x}, ${clickCoordinates.y})`
+      );
+    }
+
+    await this.automationService.humanClick(
+      clickCoordinates.x,
+      clickCoordinates.y
+    );
     await this.automationService.randomDelay(1500, 2500);
 
     this.logger.debug('✅ Liste des monuments ouverte');
+  }
+
+  /**
+   * Calcule la position des éléments d'interface pour une carte de joueur spécifique
+   */
+  private calculatePlayerCardPosition(playerIndex: number): {
+    cardX: number;
+    cardY: number;
+    cardWidth: number;
+    cardHeight: number;
+    monumentsButtonX: number;
+    monumentsButtonY: number;
+    monumentsButtonWidth: number;
+    monumentsButtonHeight: number;
+  } {
+    // Utiliser la configuration centralisée pour le layout des cartes
+    const layout = this.config.players.cardLayout;
+
+    // Calculer la position de la carte pour ce joueur
+    const cardX =
+      layout.startX + playerIndex * (layout.cardWidth + layout.spacing);
+    const cardY = layout.startY;
+
+    // Calculer la position du bouton "Grands Monuments" dans cette carte
+    const monumentsButtonX = cardX + layout.monumentsButtonOffset.x;
+    const monumentsButtonY = cardY + layout.monumentsButtonOffset.y;
+
+    this.logger.debug(
+      `📊 Carte joueur ${playerIndex + 1}: position (${cardX}, ${cardY}), taille ${layout.cardWidth}x${layout.cardHeight}`
+    );
+
+    return {
+      cardX,
+      cardY,
+      cardWidth: layout.cardWidth,
+      cardHeight: layout.cardHeight,
+      monumentsButtonX,
+      monumentsButtonY,
+      monumentsButtonWidth: layout.monumentsButtonOffset.width,
+      monumentsButtonHeight: layout.monumentsButtonOffset.height,
+    };
   }
 
   /**

@@ -58,13 +58,13 @@ export interface Config {
       maxPages: number; // Limite de pages à parcourir (sécurité)
     };
     buttons: {
-      openMonuments: { x: number; y: number };
-      openMonument: { x: number; y: number };
-      closeMonument: { x: number; y: number };
-      validate: { x: number; y: number };
-      back: { x: number; y: number };
-      nextPlayers: { x: number; y: number };
-      previousPlayers: { x: number; y: number };
+      openMonuments: { x: number; y: number; width: number; height: number };
+      openMonument: { x: number; y: number; width: number; height: number };
+      closeMonument: { x: number; y: number; width: number; height: number };
+      validate: { x: number; y: number; width: number; height: number };
+      back: { x: number; y: number; width: number; height: number };
+      nextPlayers: { x: number; y: number; width: number; height: number };
+      previousPlayers: { x: number; y: number; width: number; height: number };
     };
   };
 
@@ -88,6 +88,19 @@ export interface Config {
   players: {
     excludeList: string[]; // Liste des joueurs à exclure
     scanAllPlayers: boolean; // Si true, parcourt tous les joueurs disponibles
+    cardLayout: {
+      startX: number; // Position X de la première carte
+      startY: number; // Position Y de la première carte
+      cardWidth: number; // Largeur d'une carte de joueur
+      cardHeight: number; // Hauteur d'une carte de joueur
+      spacing: number; // Espacement horizontal entre les cartes
+      monumentsButtonOffset: {
+        x: number; // Décalage X du bouton "Grands Monuments" dans la carte
+        y: number; // Décalage Y du bouton "Grands Monuments" dans la carte
+        width: number; // Largeur du bouton
+        height: number; // Hauteur du bouton
+      };
+    };
   };
 
   // Configuration de logging
@@ -152,13 +165,13 @@ export const defaultConfig: Config = {
       maxPages: 20, // Maximum 20 pages (100 joueurs) par sécurité
     },
     buttons: {
-      openMonuments: { x: 813, y: 948 },
-      openMonument: { x: 600, y: 250 },
-      closeMonument: { x: 750, y: 100 },
-      validate: { x: 600, y: 250 },
-      back: { x: 100, y: 100 },
-      nextPlayers: { x: 650, y: 550 }, // Bouton "Suivant" pour la pagination des joueurs
-      previousPlayers: { x: 150, y: 550 }, // Bouton "Précédent" pour revenir en arrière
+      openMonuments: { x: 813, y: 948, width: 20, height: 20 },
+      openMonument: { x: 600, y: 250, width: 30, height: 30 },
+      closeMonument: { x: 750, y: 100, width: 25, height: 25 },
+      validate: { x: 600, y: 250, width: 80, height: 30 },
+      back: { x: 100, y: 100, width: 60, height: 30 },
+      nextPlayers: { x: 650, y: 550, width: 40, height: 30 }, // Bouton "Suivant" pour la pagination des joueurs
+      previousPlayers: { x: 150, y: 550, width: 40, height: 30 }, // Bouton "Précédent" pour revenir en arrière
     },
   },
   debug: {
@@ -180,6 +193,19 @@ export const defaultConfig: Config = {
       // 'JoueurAEviter2',
     ],
     scanAllPlayers: false, // Mode séquentiel par défaut (plus fiable)
+    cardLayout: {
+      startX: 279,
+      startY: 892,
+      cardWidth: 104,
+      cardHeight: 126,
+      spacing: 60,
+      monumentsButtonOffset: {
+        x: 80, // Décalage relatif depuis le bord gauche de la carte (359 - 279 = 80)
+        y: 60, // Décalage relatif depuis le bord haut de la carte (952 - 892 = 60)
+        width: 20, // Largeur du bouton "Grands Monuments"
+        height: 20, // Hauteur du bouton "Grands Monuments"
+      },
+    },
   },
   logging: {
     level: 'info',

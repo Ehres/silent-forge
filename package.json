@@ -8,6 +8,7 @@
     "start": "node dist/main.js",
     "dev": "ts-node src/main.ts",
     "calibrate": "ts-node src/calibrate.ts",
+    "calibrate-cards": "ts-node src/calibrate-cards.ts",
     "example": "ts-node src/example.ts",
     "test-modules": "ts-node src/test.ts",
     "test-player": "ts-node src/main.ts test",
