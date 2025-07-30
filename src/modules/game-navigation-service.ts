@@ -6,8 +6,10 @@ import { Logger } from '../utils/logger';
 import { loadConfig } from '../config/config';
 import { MonumentData, Opportunity } from '../types';
 import {
-  getButtonCenterWithRandomOffset,
+  getHumanLikeClickPosition,
+  HumanClickSimulator,
   ButtonCoordinates,
+  ClickBehavior,
 } from '../utils/button-utils';
 
 /**
@@ -37,6 +39,7 @@ export class GameNavigationService {
   private opportunityDetector: OpportunityDetector;
   private logger: Logger;
   private config: any;
+  private clickSimulator: HumanClickSimulator;
 
   constructor() {
     this.automationService = new AutomationService();
@@ -45,6 +48,7 @@ export class GameNavigationService {
     this.opportunityDetector = new OpportunityDetector();
     this.logger = new Logger();
     this.config = loadConfig();
+    this.clickSimulator = new HumanClickSimulator();
   }
 
   /**
@@ -537,6 +541,7 @@ export class GameNavigationService {
     this.logger.info('🏛️ Ouverture de la liste des grands monuments...');
 
     let clickCoordinates: { x: number; y: number };
+    const suggestedBehavior = this.clickSimulator.suggestBehavior();
 
     if (playerIndex !== undefined) {
       // Mode séquentiel - calculer la position basée sur l'index du joueur
@@ -549,20 +554,26 @@ export class GameNavigationService {
         height: cardLayout.monumentsButtonHeight,
       };
 
-      // Cliquer au centre du bouton avec un léger décalage aléatoire
-      clickCoordinates = getButtonCenterWithRandomOffset(monumentsButton);
+      // Utiliser le simulateur de clic humain intelligent
+      clickCoordinates = this.clickSimulator.generateClickPosition(
+        monumentsButton,
+        suggestedBehavior
+      );
 
       this.logger.debug(
-        `🎯 Bouton joueur ${playerIndex + 1}: taille ${monumentsButton.width}x${monumentsButton.height}, centre calculé: (${clickCoordinates.x}, ${clickCoordinates.y})`
+        `🎯 Bouton joueur ${playerIndex + 1}: taille ${monumentsButton.width}x${monumentsButton.height}, clic naturel (${suggestedBehavior}): (${clickCoordinates.x}, ${clickCoordinates.y})`
       );
     } else {
       // Mode classique - utiliser les coordonnées de la configuration
       const monumentsButton: ButtonCoordinates =
         this.config.ui.buttons.openMonuments;
-      clickCoordinates = getButtonCenterWithRandomOffset(monumentsButton);
+      clickCoordinates = this.clickSimulator.generateClickPosition(
+        monumentsButton,
+        suggestedBehavior
+      );
 
       this.logger.debug(
-        `🎯 Bouton depuis config: taille ${monumentsButton.width}x${monumentsButton.height}, centre calculé: (${clickCoordinates.x}, ${clickCoordinates.y})`
+        `🎯 Bouton depuis config: taille ${monumentsButton.width}x${monumentsButton.height}, clic naturel (${suggestedBehavior}): (${clickCoordinates.x}, ${clickCoordinates.y})`
       );
     }
 
@@ -573,6 +584,29 @@ export class GameNavigationService {
     await this.automationService.randomDelay(1500, 2500);
 
     this.logger.debug('✅ Liste des monuments ouverte');
+  }
+
+  /**
+   * Effectue un clic naturel sur un bouton de l'interface
+   */
+  private async clickButtonNaturally(
+    button: ButtonCoordinates,
+    buttonName: string = 'bouton'
+  ): Promise<void> {
+    const suggestedBehavior = this.clickSimulator.suggestBehavior();
+    const clickCoordinates = this.clickSimulator.generateClickPosition(
+      button,
+      suggestedBehavior
+    );
+
+    this.logger.debug(
+      `🎯 Clic naturel sur ${buttonName}: taille ${button.width}x${button.height}, comportement ${suggestedBehavior}, position (${clickCoordinates.x}, ${clickCoordinates.y})`
+    );
+
+    await this.automationService.humanClick(
+      clickCoordinates.x,
+      clickCoordinates.y
+    );
   }
 
   /**
