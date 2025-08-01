@@ -62,6 +62,47 @@ export interface OCRConfig {
 }
 
 /**
+ * Configuration spécialisée pour l'OCR de tableaux de monuments
+ */
+export interface MonumentTableOCRConfig extends OCRConfig {
+  tableRegion?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  rowHeight: number;
+  buttonColumnX: number;
+  segmentation?: {
+    nameColumn: { x: number; width: number };
+    levelColumn: { x: number; width: number };
+    progressionColumn: { x: number; width: number };
+    investmentColumn: { x: number; width: number };
+    rankColumn: { x: number; width: number };
+  };
+}
+
+/**
+ * Résultat brut de l'OCR pour une ligne de tableau
+ */
+export interface OCRTableRowResult {
+  rowIndex: number;
+  boundingBox: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  rawText: string;
+  confidence: number;
+  words: {
+    text: string;
+    confidence: number;
+    bbox: { x: number; y: number; width: number; height: number };
+  }[];
+}
+
+/**
  * Configuration des zones d'interface utilisateur
  */
 export interface UIRegions {

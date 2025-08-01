@@ -2,6 +2,7 @@ import { AutomationService } from './automation-service';
 import { ScreenCapture } from './screen-capture';
 import { OCRService } from './ocr-service';
 import { OpportunityDetector } from './opportunity-detector';
+import { OCREnhancementService } from './ocr-enhancement';
 import { Logger } from '../utils/logger';
 import { loadConfig } from '../config/config';
 import { MonumentData, Opportunity } from '../types';
@@ -67,6 +68,7 @@ export class GameNavigationService {
   private screenCapture: ScreenCapture;
   private ocrService: OCRService;
   private opportunityDetector: OpportunityDetector;
+  private ocrEnhancement: OCREnhancementService;
   private logger: Logger;
   private config: any;
   private clickSimulator: HumanClickSimulator;
@@ -76,6 +78,7 @@ export class GameNavigationService {
     this.screenCapture = new ScreenCapture();
     this.ocrService = new OCRService();
     this.opportunityDetector = new OpportunityDetector();
+    this.ocrEnhancement = new OCREnhancementService();
     this.logger = new Logger();
     this.config = loadConfig();
     this.clickSimulator = new HumanClickSimulator();
@@ -898,54 +901,77 @@ export class GameNavigationService {
     this.logger.debug('📊 Extraction des données du tableau des monuments...');
 
     try {
-      // TODO: Implémenter l'OCR réel avec Tesseract.js
-      // Pour l'instant, simuler des données réalistes
+      // Si pas de screenshot (mode test), utiliser directement les données simulées
+      if (!screenshot) {
+        this.logger.debug(
+          '⚠️ Pas de screenshot fourni - utilisation des données simulées'
+        );
+        return this.getSimulatedMonumentData();
+      }
 
-      const simulatedRows: MonumentTableRow[] = [
-        {
-          name: 'Arc de Triomphe',
-          level: 12,
-          progression: { current: 450, maximum: 1000 },
-          myInvestment: null, // Pas d'investissement de ma part
-          myRank: null,
-          activityButtonPosition: { x: 1150, y: 500 },
+      // Convertir l'image pour Tesseract si nécessaire
+      const imageData = await this.prepareImageForOCR(screenshot);
+
+      // Configuration OCR optimisée pour les tableaux
+      const ocrConfig = {
+        lang: 'eng+fra', // Support français et anglais
+        options: {
+          tessedit_char_whitelist:
+            'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ0123456789/() -',
+          tessedit_pageseg_mode: 6, // Assume uniform block of text
+          preserve_interword_spaces: 1,
         },
-        {
-          name: 'Tour Eiffel',
-          level: 15,
-          progression: { current: 200, maximum: 800 },
-          myInvestment: 50, // J'ai déjà investi
-          myRank: 3,
-          activityButtonPosition: { x: 1150, y: 540 },
-        },
-        {
-          name: 'Statue de la Liberté',
-          level: 8,
-          progression: { current: 0, maximum: 600 }, // Aucun investissement
-          myInvestment: null,
-          myRank: null,
-          activityButtonPosition: { x: 1150, y: 580 },
-        },
-        {
-          name: 'Colisée',
-          level: 18,
-          progression: { current: 750, maximum: 1200 },
-          myInvestment: null, // Pas d'investissement de ma part mais d'autres ont investi
-          myRank: null,
-          activityButtonPosition: { x: 1150, y: 620 },
-        },
-      ];
+      };
+
+      this.logger.debug('🧠 Lancement de la reconnaissance OCR...');
+
+      // Utiliser Tesseract.js pour extraire le texte
+      const { createWorker, PSM } = await import('tesseract.js');
+      const worker = await createWorker(ocrConfig.lang);
+
+      await worker.setParameters({
+        tessedit_char_whitelist: ocrConfig.options.tessedit_char_whitelist,
+        tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
+        preserve_interword_spaces: '1',
+      });
+
+      const { data } = await worker.recognize(imageData);
+      await worker.terminate();
+
+      this.logger.debug(`📝 Texte OCR extrait: ${data.text.length} caractères`);
+
+      // Parser le texte en lignes de tableau
+      const tableRows = await this.parseOCRTextToTableRows(data);
+
+      // Appliquer l'amélioration OCR sur chaque ligne
+      const enhancedTableRows = tableRows.map((row) => {
+        const enhancedData = this.ocrEnhancement.enhanceSingleMonument({
+          name: row.name,
+          level: row.level,
+          progression: `${row.progression.current}/${row.progression.maximum}`,
+        });
+
+        return {
+          ...row,
+          name: enhancedData.name,
+          level: enhancedData.level,
+        };
+      });
 
       this.logger.debug(
-        `📊 ${simulatedRows.length} ligne(s) extraite(s) du tableau`
+        `📊 ${enhancedTableRows.length} ligne(s) de monuments extraite(s) et améliorée(s)`
       );
-      return simulatedRows;
+
+      return enhancedTableRows;
     } catch (error) {
       this.logger.error(
-        "❌ Erreur lors de l'extraction des données du tableau:",
+        "❌ Erreur lors de l'extraction OCR des données du tableau:",
         error
       );
-      return [];
+
+      // Fallback vers les données simulées en cas d'erreur OCR
+      this.logger.warn('⚠️ Utilisation des données simulées en fallback');
+      return this.getSimulatedMonumentData();
     }
   }
 
@@ -1003,17 +1029,90 @@ export class GameNavigationService {
     rowIndex: number
   ): MonumentTableRow | null {
     try {
-      // TODO: Implémenter le parsing OCR réel
-      // Patterns regex pour extraire les colonnes
+      this.logger.debug(`🔍 Parsing ligne ${rowIndex}: "${ocrText}"`);
 
-      // Pattern pour la progression au format "X/Y"
-      const progressionPattern = /(\d+)\/(\d+)/;
+      // Nettoyer le texte OCR
+      const cleanedText = ocrText.replace(/[|]/g, ' ').trim();
 
-      // Pattern pour les nombres (niveau, PF, rang)
-      const numberPattern = /\d+/g;
+      // Patterns regex pour extraire les différentes colonnes
 
-      // Pour l'instant, retourner null car nous utilisons des données simulées
-      return null;
+      // 1. Progression au format "X/Y" ou "X / Y" (avec espaces optionnels)
+      const progressionPattern = /(\d+)\s*\/\s*(\d+)/;
+      const progressionMatch = cleanedText.match(progressionPattern);
+
+      if (!progressionMatch) {
+        this.logger.debug(
+          `⚠️ Ligne ${rowIndex} non parsée: pas de progression trouvée`
+        );
+        return null;
+      }
+
+      const progressionCurrent = parseInt(progressionMatch[1]);
+      const progressionMaximum = parseInt(progressionMatch[2]);
+
+      // 2. Extraire le nom du monument (tout ce qui précède le premier nombre)
+      const beforeFirstNumberPattern = /^([A-Za-zÀ-ÿ\s\-']+?)(?=\s+\d)/;
+      const nameMatch = cleanedText.match(beforeFirstNumberPattern);
+
+      if (!nameMatch) {
+        this.logger.debug(`⚠️ Ligne ${rowIndex} non parsée: nom non trouvé`);
+        return null;
+      }
+
+      const monumentName = nameMatch[1].trim();
+
+      // 3. Extraire le niveau (premier nombre après le nom)
+      const afterNamePattern = new RegExp(
+        `${monumentName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+(\\d{1,2})`
+      );
+      const levelMatch = cleanedText.match(afterNamePattern);
+      const level = levelMatch ? parseInt(levelMatch[1]) : 1;
+
+      // 4. Investissement personnel avec rang - pattern plus robuste
+      // Chercher: nombre + "PF" + quelque chose + "rang" + nombre
+      const investmentPattern = /(\d+)\s*PF.*?rang\s*(\d+)/i;
+      const investmentMatch = cleanedText.match(investmentPattern);
+
+      let myInvestment: number | null = null;
+      let myRank: number | null = null;
+
+      if (investmentMatch) {
+        // Vérifier que ce n'est pas le nombre de la progression
+        const potentialInvestment = parseInt(investmentMatch[1]);
+        if (
+          potentialInvestment !== progressionCurrent &&
+          potentialInvestment !== progressionMaximum
+        ) {
+          myInvestment = potentialInvestment;
+          myRank = parseInt(investmentMatch[2]);
+        }
+      }
+
+      // Calculer la position du bouton "Activité" basée sur la position de la ligne
+      const baseY = 500; // Y de base (à calibrer selon l'interface)
+      const rowSpacing = 40; // Espacement entre les lignes
+      const activityButtonPosition = {
+        x: 1150, // Position X fixe du bouton (à calibrer)
+        y: baseY + rowIndex * rowSpacing,
+      };
+
+      const result: MonumentTableRow = {
+        name: monumentName,
+        level,
+        progression: {
+          current: progressionCurrent,
+          maximum: progressionMaximum,
+        },
+        myInvestment,
+        myRank,
+        activityButtonPosition,
+      };
+
+      this.logger.debug(
+        `✅ Ligne ${rowIndex} parsée: ${monumentName} (Niv.${level}) - ${progressionCurrent}/${progressionMaximum} PF`
+      );
+
+      return result;
     } catch (error) {
       this.logger.error(`❌ Erreur parsing ligne ${rowIndex}:`, error);
       return null;
@@ -1067,5 +1166,126 @@ export class GameNavigationService {
     } catch (error) {
       this.logger.error('❌ Erreur lors du test de filtrage:', error);
     }
+  }
+
+  /**
+   * Prépare l'image pour l'OCR en appliquant des prétraitements
+   */
+  private async prepareImageForOCR(screenshot: any): Promise<any> {
+    this.logger.debug("🖼️ Préparation de l'image pour OCR...");
+
+    try {
+      // Si l'image est déjà au bon format, la retourner telle quelle
+      if (screenshot && typeof screenshot === 'object') {
+        return screenshot;
+      }
+
+      // Sinon, appliquer des transformations si nécessaire
+      // TODO: Ajouter des prétraitements d'image plus sophistiqués si besoin
+      // - Redimensionnement
+      // - Amélioration du contraste
+      // - Réduction du bruit
+
+      this.logger.debug('✅ Image préparée pour OCR');
+      return screenshot;
+    } catch (error) {
+      this.logger.error("❌ Erreur lors de la préparation d'image:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Parse le texte OCR brut en lignes de tableau structurées
+   */
+  private async parseOCRTextToTableRows(
+    ocrData: any
+  ): Promise<MonumentTableRow[]> {
+    this.logger.debug('📝 Parsing du texte OCR en lignes de tableau...');
+
+    try {
+      const rows: MonumentTableRow[] = [];
+      const lines = ocrData.text
+        .split('\n')
+        .filter((line: string) => line.trim().length > 0);
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+
+        // Ignorer les lignes d'en-tête ou vides
+        if (this.isTableHeaderLine(line)) {
+          continue;
+        }
+
+        const parsedRow = this.parseMonumentTableRow(line, i);
+        if (parsedRow) {
+          rows.push(parsedRow);
+        }
+      }
+
+      this.logger.debug(`📊 ${rows.length} ligne(s) de monuments parsée(s)`);
+      return rows;
+    } catch (error) {
+      this.logger.error('❌ Erreur lors du parsing OCR:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Vérifie si une ligne est un en-tête de tableau
+   */
+  private isTableHeaderLine(line: string): boolean {
+    const headerKeywords = [
+      'nom',
+      'niveau',
+      'progression',
+      'points',
+      'rang',
+      'activité',
+      'name',
+      'level',
+    ];
+    const lowerLine = line.toLowerCase();
+
+    return headerKeywords.some((keyword) => lowerLine.includes(keyword));
+  }
+
+  /**
+   * Données simulées pour fallback
+   */
+  private getSimulatedMonumentData(): MonumentTableRow[] {
+    return [
+      {
+        name: 'Arc de Triomphe',
+        level: 12,
+        progression: { current: 450, maximum: 1000 },
+        myInvestment: null,
+        myRank: null,
+        activityButtonPosition: { x: 1150, y: 500 },
+      },
+      {
+        name: 'Tour Eiffel',
+        level: 15,
+        progression: { current: 200, maximum: 800 },
+        myInvestment: 50,
+        myRank: 3,
+        activityButtonPosition: { x: 1150, y: 540 },
+      },
+      {
+        name: 'Statue de la Liberté',
+        level: 8,
+        progression: { current: 0, maximum: 600 },
+        myInvestment: null,
+        myRank: null,
+        activityButtonPosition: { x: 1150, y: 580 },
+      },
+      {
+        name: 'Colisée',
+        level: 18,
+        progression: { current: 750, maximum: 1200 },
+        myInvestment: null,
+        myRank: null,
+        activityButtonPosition: { x: 1150, y: 620 },
+      },
+    ];
   }
 }

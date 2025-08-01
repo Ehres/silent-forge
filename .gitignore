@@ -47,3 +47,5 @@ Thumbs.db
 screenshots/
 captures/
 temp_images/
+
+*.traineddata
