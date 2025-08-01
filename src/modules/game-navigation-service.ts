@@ -22,6 +22,36 @@ export interface InvestedMonument {
 }
 
 /**
+ * Représente un monument détecté via OCR dans le tableau
+ */
+export interface MonumentTableRow {
+  name: string;
+  level: number;
+  progression: {
+    current: number; // PF déjà investis par tous les joueurs
+    maximum: number; // PF maximum possible
+  };
+  myInvestment: number | null; // Mes PF investis (null si aucun)
+  myRank: number | null; // Mon rang (null si aucun)
+  activityButtonPosition: { x: number; y: number }; // Position du bouton "Activité"
+}
+
+/**
+ * Représente un monument avec investissements existants mais sans les miens
+ */
+export interface TargetMonument {
+  name: string;
+  level: number;
+  progression: {
+    current: number;
+    maximum: number;
+  };
+  hasOthersInvestments: boolean; // Toujours true pour les monuments ciblés
+  hasMyInvestments: boolean; // Toujours false pour les monuments ciblés
+  activityButtonPosition: { x: number; y: number };
+}
+
+/**
  * Représente un joueur avec ses monuments
  */
 export interface Player {
@@ -377,18 +407,18 @@ export class GameNavigationService {
       // 1. Ouvrir la liste des grands monuments (avec position dynamique)
       await this.openMonumentsList(playerPosition - 1); // playerPosition est 1-based, index est 0-based
 
-      // 2. Identifier les monuments avec investissements
+      // 2. Identifier les monuments avec investissements existants mais sans les miens
       const monuments = await this.identifyInvestedMonuments();
 
       if (monuments.length === 0) {
         this.logger.info(
-          `   ℹ️ Aucun monument avec investissement (position ${playerPosition})`
+          `   ℹ️ Aucun monument ciblé (position ${playerPosition})`
         );
         return;
       }
 
       this.logger.info(
-        `   🏛️ ${monuments.length} monument(s) avec investissements détecté(s)`
+        `   🏛️ ${monuments.length} monument(s) ciblé(s) détecté(s) (avec investissements mais sans les miens)`
       );
 
       // 3. Traiter chaque monument
@@ -492,14 +522,14 @@ export class GameNavigationService {
 
       if (monuments.length === 0) {
         this.logger.info(
-          `   ℹ️ Aucun monument avec investissement trouvé pour ${playerName}`
+          `   ℹ️ Aucun monument ciblé trouvé pour ${playerName}`
         );
         await this.returnToPlayersList();
         return;
       }
 
       this.logger.info(
-        `   🏛️ ${monuments.length} monument(s) avec investissements détecté(s)`
+        `   🏛️ ${monuments.length} monument(s) ciblé(s) détecté(s) (avec investissements mais sans les miens)`
       );
 
       // 4. Traiter chaque monument
@@ -651,7 +681,7 @@ export class GameNavigationService {
   }
 
   /**
-   * Identifier les monuments avec des investissements existants
+   * Identifier les monuments avec des investissements existants mais sans les miens
    */
   async identifyInvestedMonuments(): Promise<InvestedMonument[]> {
     this.logger.info('🔍 Identification des monuments avec investissements...');
@@ -660,10 +690,10 @@ export class GameNavigationService {
       // Capturer la zone de la liste des monuments
       const screenshot = await this.screenCapture.captureScreen({
         region: {
-          x: 100, // À calibrer selon l'interface
-          y: 200,
-          width: 800,
-          height: 500,
+          x: 520,
+          y: 450,
+          width: 670,
+          height: 315,
         },
       });
 
@@ -674,26 +704,35 @@ export class GameNavigationService {
         await this.screenCapture.saveCapture(screenshot, filename);
       }
 
-      // TODO: Utiliser OCR pour détecter les monuments avec investissements
-      // Chercher des patterns comme "PF investis", "Points actifs", etc.
+      // Extraire les données du tableau via OCR
+      const tableData = await this.extractMonumentTableData(screenshot);
 
-      // Données simulées pour le développement
-      const monuments: InvestedMonument[] = [
-        {
-          name: 'Arc de Triomphe',
-          hasInvestments: true,
-          position: { x: 600, y: 250 },
-        },
-        {
-          name: 'Tour Eiffel',
-          hasInvestments: true,
-          position: { x: 600, y: 350 },
-        },
-      ];
+      // Filtrer selon nos critères : investissements existants MAIS pas les miens
+      const targetMonuments = this.filterTargetMonuments(tableData);
+
+      // Convertir en format InvestedMonument pour compatibilité
+      const monuments: InvestedMonument[] = targetMonuments.map(
+        (monument: TargetMonument) => ({
+          name: monument.name,
+          hasInvestments: monument.hasOthersInvestments,
+          position: monument.activityButtonPosition,
+        })
+      );
 
       this.logger.success(
-        `✅ ${monuments.length} monument(s) avec investissements identifié(s)`
+        `✅ ${monuments.length} monument(s) ciblé(s) identifié(s) (avec investissements mais sans les miens)`
       );
+
+      // Log détaillé des monuments filtrés
+      if (monuments.length > 0) {
+        this.logger.info('🎯 Monuments ciblés:');
+        targetMonuments.forEach((monument: TargetMonument) => {
+          this.logger.info(
+            `   • ${monument.name} (Niv.${monument.level}) - ${monument.progression.current}/${monument.progression.maximum} PF`
+          );
+        });
+      }
+
       return monuments;
     } catch (error) {
       this.logger.error(
@@ -848,5 +887,185 @@ export class GameNavigationService {
 
     await this.automationService.randomDelay(1000, 1500);
     this.logger.debug('✅ Retour à la liste des joueurs');
+  }
+
+  /**
+   * Extrait les données du tableau des monuments via OCR
+   */
+  private async extractMonumentTableData(
+    screenshot: any
+  ): Promise<MonumentTableRow[]> {
+    this.logger.debug('📊 Extraction des données du tableau des monuments...');
+
+    try {
+      // TODO: Implémenter l'OCR réel avec Tesseract.js
+      // Pour l'instant, simuler des données réalistes
+
+      const simulatedRows: MonumentTableRow[] = [
+        {
+          name: 'Arc de Triomphe',
+          level: 12,
+          progression: { current: 450, maximum: 1000 },
+          myInvestment: null, // Pas d'investissement de ma part
+          myRank: null,
+          activityButtonPosition: { x: 1150, y: 500 },
+        },
+        {
+          name: 'Tour Eiffel',
+          level: 15,
+          progression: { current: 200, maximum: 800 },
+          myInvestment: 50, // J'ai déjà investi
+          myRank: 3,
+          activityButtonPosition: { x: 1150, y: 540 },
+        },
+        {
+          name: 'Statue de la Liberté',
+          level: 8,
+          progression: { current: 0, maximum: 600 }, // Aucun investissement
+          myInvestment: null,
+          myRank: null,
+          activityButtonPosition: { x: 1150, y: 580 },
+        },
+        {
+          name: 'Colisée',
+          level: 18,
+          progression: { current: 750, maximum: 1200 },
+          myInvestment: null, // Pas d'investissement de ma part mais d'autres ont investi
+          myRank: null,
+          activityButtonPosition: { x: 1150, y: 620 },
+        },
+      ];
+
+      this.logger.debug(
+        `📊 ${simulatedRows.length} ligne(s) extraite(s) du tableau`
+      );
+      return simulatedRows;
+    } catch (error) {
+      this.logger.error(
+        "❌ Erreur lors de l'extraction des données du tableau:",
+        error
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Filtre les monuments selon nos critères :
+   * - Ont des investissements existants (progression.current > 0)
+   * - N'ont pas mes investissements (myInvestment === null)
+   */
+  private filterTargetMonuments(
+    tableData: MonumentTableRow[]
+  ): TargetMonument[] {
+    this.logger.debug('🎯 Filtrage des monuments cibles...');
+
+    const targetMonuments = tableData
+      .filter((row) => {
+        const hasOthersInvestments = row.progression.current > 0;
+        const hasMyInvestments = row.myInvestment !== null;
+
+        // Critères : investissements existants MAIS pas les miens
+        return hasOthersInvestments && !hasMyInvestments;
+      })
+      .map((row) => ({
+        name: row.name,
+        level: row.level,
+        progression: row.progression,
+        hasOthersInvestments: true,
+        hasMyInvestments: false,
+        activityButtonPosition: row.activityButtonPosition,
+      }));
+
+    this.logger.debug(
+      `🎯 ${targetMonuments.length} monument(s) correspondent aux critères`
+    );
+
+    // Log détaillé du filtrage
+    tableData.forEach((row) => {
+      const hasOthers = row.progression.current > 0;
+      const hasMine = row.myInvestment !== null;
+      const isTarget = hasOthers && !hasMine;
+
+      this.logger.debug(
+        `   ${isTarget ? '✅' : '❌'} ${row.name}: autres=${hasOthers ? 'OUI' : 'NON'}, moi=${hasMine ? 'OUI' : 'NON'}`
+      );
+    });
+
+    return targetMonuments;
+  }
+
+  /**
+   * Parse une ligne du tableau des monuments via OCR
+   * Format attendu : | Nom | Niveau | Progression | Points de forge | Rang | Activité |
+   */
+  private parseMonumentTableRow(
+    ocrText: string,
+    rowIndex: number
+  ): MonumentTableRow | null {
+    try {
+      // TODO: Implémenter le parsing OCR réel
+      // Patterns regex pour extraire les colonnes
+
+      // Pattern pour la progression au format "X/Y"
+      const progressionPattern = /(\d+)\/(\d+)/;
+
+      // Pattern pour les nombres (niveau, PF, rang)
+      const numberPattern = /\d+/g;
+
+      // Pour l'instant, retourner null car nous utilisons des données simulées
+      return null;
+    } catch (error) {
+      this.logger.error(`❌ Erreur parsing ligne ${rowIndex}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Méthode de test pour valider la logique de filtrage
+   */
+  async testMonumentFiltering(): Promise<void> {
+    this.logger.info('🧪 Test de la logique de filtrage des monuments...');
+
+    try {
+      // Simuler une capture d'écran
+      const mockScreenshot = null; // Placeholder
+
+      // Extraire les données (utilisera les données simulées)
+      const tableData = await this.extractMonumentTableData(mockScreenshot);
+
+      this.logger.info(
+        `📊 ${tableData.length} monument(s) extraits du tableau:`
+      );
+      tableData.forEach((row: MonumentTableRow) => {
+        const statusMoi = row.myInvestment
+          ? `${row.myInvestment}PF (rang ${row.myRank})`
+          : 'Aucun';
+        this.logger.info(
+          `   • ${row.name} (Niv.${row.level}): ${row.progression.current}/${row.progression.maximum} PF - Moi: ${statusMoi}`
+        );
+      });
+
+      // Appliquer le filtrage
+      const targetMonuments = this.filterTargetMonuments(tableData);
+
+      this.logger.success(
+        `🎯 ${targetMonuments.length} monument(s) correspondent aux critères de ciblage`
+      );
+
+      if (targetMonuments.length > 0) {
+        this.logger.info('✅ Monuments sélectionnés pour investissement:');
+        targetMonuments.forEach((monument: TargetMonument) => {
+          this.logger.info(
+            `   → ${monument.name}: ${monument.progression.current}/${monument.progression.maximum} PF déjà investis par d'autres`
+          );
+        });
+      } else {
+        this.logger.info(
+          'ℹ️ Aucun monument ne correspond aux critères actuellement'
+        );
+      }
+    } catch (error) {
+      this.logger.error('❌ Erreur lors du test de filtrage:', error);
+    }
   }
 }
