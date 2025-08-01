@@ -90,7 +90,33 @@ class SilentForgeMain {
     );
     this.displayWorkflowInfo();
 
+    await this.showCountdownBeforeStart();
+
     await this.gameNavigationService.processAllPlayersSequential();
+  }
+
+  /**
+   * Affiche un countdown avant le démarrage automatique
+   */
+  private async showCountdownBeforeStart(): Promise<void> {
+    const countdownDurationInSeconds = 5;
+
+    this.logger.info('⏰ Démarrage automatique dans:');
+
+    for (let i = countdownDurationInSeconds; i > 0; i--) {
+      this.logger.info(`   ${i} seconde${i > 1 ? 's' : ''}...`);
+      await this.delay(1000);
+    }
+
+    this.logger.info('🚀 Démarrage maintenant!');
+    this.logger.info('');
+  }
+
+  /**
+   * Délai d'attente en millisecondes
+   */
+  private async delay(milliseconds: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
 
   /**

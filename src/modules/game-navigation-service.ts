@@ -693,22 +693,30 @@ export class GameNavigationService {
       // Capturer la zone de la liste des monuments
       const screenshot = await this.screenCapture.captureScreen({
         region: {
-          x: 520,
+          x: 550,
           y: 450,
-          width: 670,
+          width: 475,
           height: 315,
         },
       });
 
-      // Sauvegarder pour debug si activé
+      // Sauvegarder pour debug si activé ET pour utiliser le fichier avec OCR
+      let imagePath: string | null = null;
       if (this.config.debug.saveCaptures) {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const filename = `monuments_list_${timestamp}`;
         await this.screenCapture.saveCapture(screenshot, filename);
+
+        // Construire le chemin complet du fichier sauvegardé
+        const path = await import('path');
+        imagePath = path.join(process.cwd(), 'captures', `${filename}.png`);
+        this.logger.debug(`📁 Fichier image sauvegardé: ${imagePath}`);
       }
 
-      // Extraire les données du tableau via OCR
-      const tableData = await this.extractMonumentTableData(screenshot);
+      // Extraire les données du tableau via OCR (utiliser le fichier plutôt que l'objet)
+      const tableData = await this.extractMonumentTableData(
+        imagePath || screenshot
+      );
 
       // Filtrer selon nos critères : investissements existants MAIS pas les miens
       const targetMonuments = this.filterTargetMonuments(tableData);
@@ -1175,23 +1183,80 @@ export class GameNavigationService {
     this.logger.debug("🖼️ Préparation de l'image pour OCR...");
 
     try {
-      // Si l'image est déjà au bon format, la retourner telle quelle
-      if (screenshot && typeof screenshot === 'object') {
+      // Si c'est un string (chemin de fichier) - priorité car plus fiable
+      if (typeof screenshot === 'string') {
+        this.logger.debug('✅ Utilisation du chemin de fichier pour OCR');
         return screenshot;
       }
 
-      // Sinon, appliquer des transformations si nécessaire
-      // TODO: Ajouter des prétraitements d'image plus sophistiqués si besoin
-      // - Redimensionnement
-      // - Amélioration du contraste
-      // - Réduction du bruit
+      // Si c'est déjà un Buffer ou autre format compatible
+      if (Buffer.isBuffer(screenshot)) {
+        this.logger.debug('✅ Image déjà en format Buffer');
+        return screenshot;
+      }
 
-      this.logger.debug('✅ Image préparée pour OCR');
+      // Si l'image vient de @nut-tree-fork/nut-js (objet Image)
+      if (
+        screenshot &&
+        screenshot.data &&
+        screenshot.width &&
+        screenshot.height
+      ) {
+        this.logger.debug(
+          '📸 Image @nut-tree-fork/nut-js détectée, utilisation directe pour Tesseract'
+        );
+
+        // Tesseract.js peut parfois accepter directement les données d'image raw
+        // Essayons d'abord de retourner l'objet tel quel
+        this.logger.debug("✅ Utilisation directe de l'objet Image pour OCR");
+        return screenshot;
+      }
+
+      // Fallback - essayer de retourner tel quel
+      this.logger.debug("⚠️ Format d'image non reconnu, tentative directe");
       return screenshot;
     } catch (error) {
       this.logger.error("❌ Erreur lors de la préparation d'image:", error);
       throw error;
     }
+  }
+
+  /**
+   * Convertit une image @nut-tree-fork/nut-js vers Jimp
+   * (Copie de la méthode dans ScreenCapture pour éviter les dépendances circulaires)
+   */
+  private async createJimpFromNutImage(nutImage: any): Promise<any> {
+    const { width, height, data, channels } = nutImage;
+
+    // Créer un buffer RGBA standard (4 channels)
+    const rgbaBuffer = Buffer.alloc(width * height * 4);
+
+    for (let i = 0; i < width * height; i++) {
+      const srcIndex = i * channels;
+      const dstIndex = i * 4;
+
+      if (channels >= 3) {
+        rgbaBuffer[dstIndex] = data[srcIndex]; // R
+        rgbaBuffer[dstIndex + 1] = data[srcIndex + 1]; // G
+        rgbaBuffer[dstIndex + 2] = data[srcIndex + 2]; // B
+        rgbaBuffer[dstIndex + 3] = channels === 4 ? data[srcIndex + 3] : 255; // A
+      } else if (channels === 1) {
+        // Grayscale vers RGBA
+        const gray = data[srcIndex];
+        rgbaBuffer[dstIndex] = gray; // R
+        rgbaBuffer[dstIndex + 1] = gray; // G
+        rgbaBuffer[dstIndex + 2] = gray; // B
+        rgbaBuffer[dstIndex + 3] = 255; // A
+      }
+    }
+
+    // Utiliser la méthode create de Jimp avec un objet de configuration
+    const jimp = await import('jimp');
+    return new jimp.Jimp({
+      data: rgbaBuffer,
+      width,
+      height,
+    });
   }
 
   /**
