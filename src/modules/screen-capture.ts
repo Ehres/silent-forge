@@ -48,10 +48,10 @@ export class ScreenCapture {
     // Ces valeurs devront être ajustées selon l'interface du jeu
     const monumentConfig: CaptureConfig = {
       region: {
-        x: 100,
-        y: 100,
-        width: 800,
-        height: 600,
+        x: 477,
+        y: 568,
+        width: 780,
+        height: 195,
       },
     };
 

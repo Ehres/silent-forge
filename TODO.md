@@ -2,5 +2,8 @@
 
 ## 🚀 Prochaines étapes prioritaires
 
-- [x] Ajouter la liste des monuments connus dans la base de données.
-- [ ] Placement déjà effectué sur les monuments non connus.
+- analyzeMonument:
+  - Implémenter la fonction `analyzeMonument` pour analyser le monument et
+    extraire les informations nécessaires: Joueurs, Investissements,
+    Rang, etc.
+  - Survol des boutons "rang" pour avoir plus d'information sur les gains potentiels
