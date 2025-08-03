@@ -19,7 +19,7 @@ import {
 export interface InvestedMonument {
   name: string;
   hasInvestments: boolean;
-  position: { x: number; y: number }; // Position du bouton "Ouvrir"
+  position: { x: number; y: number; width: number; height: number }; // Position du bouton "Ouvrir"
 }
 
 /**
@@ -34,7 +34,12 @@ export interface MonumentTableRow {
   };
   myInvestment: number | null; // Mes PF investis (null si aucun)
   myRank: number | null; // Mon rang (null si aucun)
-  activityButtonPosition: { x: number; y: number }; // Position du bouton "Activité"
+  activityButtonPosition: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }; // Position du bouton "Activité"
 }
 
 /**
@@ -49,7 +54,12 @@ export interface TargetMonument {
   };
   hasOthersInvestments: boolean; // Toujours true pour les monuments ciblés
   hasMyInvestments: boolean; // Toujours false pour les monuments ciblés
-  activityButtonPosition: { x: number; y: number };
+  activityButtonPosition: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
 }
 
 /**
@@ -761,10 +771,10 @@ export class GameNavigationService {
     this.logger.info(`🏛️ Traitement du monument: ${monument.name}`);
 
     try {
-      // 1. Cliquer sur le bouton "Ouvrir" du monument
-      await this.automationService.humanClick(
-        monument.position.x,
-        monument.position.y
+      // 1. Cliquer sur le bouton "Ouvrir" du monument avec clic naturel
+      await this.clickButtonNaturally(
+        monument.position,
+        `Ouvrir (${monument.name})`
       );
       await this.automationService.randomDelay(1500, 2500);
 
@@ -1097,11 +1107,13 @@ export class GameNavigationService {
       }
 
       // Calculer la position du bouton "Activité" basée sur la position de la ligne
-      const baseY = 500; // Y de base (à calibrer selon l'interface)
-      const rowSpacing = 40; // Espacement entre les lignes
+      const baseY = 451; // Y de base (à calibrer selon l'interface)
+      const rowSpacing = 8; // Espacement entre les lignes
       const activityButtonPosition = {
-        x: 1150, // Position X fixe du bouton (à calibrer)
+        x: 1060, // Position X fixe du bouton (à calibrer)
         y: baseY + rowIndex * rowSpacing,
+        height: 22,
+        width: 130,
       };
 
       const result: MonumentTableRow = {
@@ -1325,7 +1337,7 @@ export class GameNavigationService {
         progression: { current: 450, maximum: 1000 },
         myInvestment: null,
         myRank: null,
-        activityButtonPosition: { x: 1150, y: 500 },
+        activityButtonPosition: { x: 1150, y: 500, width: 130, height: 22 },
       },
       {
         name: 'Tour Eiffel',
@@ -1333,7 +1345,7 @@ export class GameNavigationService {
         progression: { current: 200, maximum: 800 },
         myInvestment: 50,
         myRank: 3,
-        activityButtonPosition: { x: 1150, y: 540 },
+        activityButtonPosition: { x: 1150, y: 540, width: 130, height: 22 },
       },
       {
         name: 'Statue de la Liberté',
@@ -1341,7 +1353,7 @@ export class GameNavigationService {
         progression: { current: 0, maximum: 600 },
         myInvestment: null,
         myRank: null,
-        activityButtonPosition: { x: 1150, y: 580 },
+        activityButtonPosition: { x: 1150, y: 580, width: 130, height: 22 },
       },
       {
         name: 'Colisée',
@@ -1349,7 +1361,7 @@ export class GameNavigationService {
         progression: { current: 750, maximum: 1200 },
         myInvestment: null,
         myRank: null,
-        activityButtonPosition: { x: 1150, y: 620 },
+        activityButtonPosition: { x: 1150, y: 620, width: 130, height: 22 },
       },
     ];
   }
