@@ -1,6 +1,12 @@
 import Tesseract from 'tesseract.js';
 import { Image } from '@nut-tree-fork/nut-js';
-import { MonumentData, MonumentPlace, OCRConfig } from '../types';
+import {
+  MonumentData,
+  MonumentPlace,
+  OCRConfig,
+  MonumentInvestmentData,
+  PlayerInvestment,
+} from '../types';
 import { Logger } from '../utils/logger';
 
 /**
@@ -28,6 +34,7 @@ export class OCRService {
    */
   async analyzeMonument(
     image: Image,
+    ownerName?: string,
     config?: OCRConfig
   ): Promise<MonumentData> {
     try {
@@ -35,11 +42,10 @@ export class OCRService {
 
       const ocrConfig = { ...this.defaultConfig, ...config };
 
-      // Pour l'instant, on simule l'analyse OCR
-      // TODO: Implémenter la vraie analyse une fois que l'API Image est clarifiée
-      this.logger.debug('OCR simulé - extraction de données de test');
+      // Simuler l'extraction des investissements
+      const investmentData = await this.extractInvestmentData(image, ownerName);
 
-      // Données de test simulées
+      // Données de test simulées avec support des récompenses
       const places: MonumentPlace[] = [
         {
           position: 1,
@@ -47,6 +53,7 @@ export class OCRService {
           return: 280,
           playerName: 'TestPlayer1',
           isAvailable: true,
+          rewards: [], // Sera rempli par analyzeMonumentOpportunities
         },
         {
           position: 2,
@@ -54,6 +61,7 @@ export class OCRService {
           return: 220,
           playerName: 'TestPlayer2',
           isAvailable: true,
+          rewards: [],
         },
         {
           position: 3,
@@ -61,6 +69,7 @@ export class OCRService {
           return: 170,
           playerName: 'TestPlayer3',
           isAvailable: false,
+          rewards: [],
         },
         {
           position: 4,
@@ -68,6 +77,7 @@ export class OCRService {
           return: 350,
           playerName: 'TestPlayer4',
           isAvailable: true,
+          rewards: [],
         },
         {
           position: 5,
@@ -75,6 +85,7 @@ export class OCRService {
           return: 110,
           playerName: 'TestPlayer5',
           isAvailable: true,
+          rewards: [],
         },
       ];
 
@@ -83,16 +94,109 @@ export class OCRService {
         places,
         timestamp: new Date(),
         hasExistingInvestments: true,
+        investmentData: investmentData,
       };
 
       this.logger.success(
         `✅ ${places.length} places détectées dans le monument`
       );
+
+      if (investmentData) {
+        this.logger.info(
+          `💰 Données d'investissement: Propriétaire ${investmentData.ownerName} (${investmentData.ownerForgePoints} PF), ${investmentData.playerInvestments.length} autres investisseurs`
+        );
+      }
+
       return monumentData;
     } catch (error) {
       this.logger.error("Erreur lors de l'analyse OCR:", error);
       throw error;
     }
+  }
+
+  /**
+   * Extrait les données d'investissement du monument via OCR
+   */
+  private async extractInvestmentData(
+    image: Image,
+    ownerName?: string
+  ): Promise<MonumentInvestmentData | undefined> {
+    try {
+      this.logger.debug("📊 Extraction des données d'investissement...");
+
+      // TODO: Implémenter l'OCR réelle pour extraire les investissements
+      // Pour l'instant, simulons des données avec le propriétaire fourni
+
+      const simulatedInvestmentData: MonumentInvestmentData = {
+        ownerName: ownerName || 'PropriétaireInconnu',
+        ownerForgePoints: Math.floor(Math.random() * 1000) + 500, // 500-1500 PF simulés
+        playerInvestments: [
+          {
+            playerName: 'Investisseur1',
+            forgePoints: Math.floor(Math.random() * 300) + 100,
+            rank: 1,
+          },
+          {
+            playerName: 'Investisseur2',
+            forgePoints: Math.floor(Math.random() * 200) + 50,
+            rank: 2,
+          },
+          {
+            playerName: 'Investisseur3',
+            forgePoints: Math.floor(Math.random() * 150) + 25,
+            rank: 3,
+          },
+        ],
+      };
+
+      this.logger.debug(
+        `✅ Données d'investissement simulées pour ${simulatedInvestmentData.ownerName}`
+      );
+
+      return simulatedInvestmentData;
+    } catch (error) {
+      this.logger.error(
+        "❌ Erreur extraction données d'investissement:",
+        error
+      );
+      return undefined;
+    }
+  }
+
+  /**
+   * Parse le texte OCR pour extraire les investissements réels
+   * Format attendu : "PlayerName: 150 PF (rang 3)"
+   */
+  private parseInvestmentText(ocrText: string): PlayerInvestment[] {
+    const investments: PlayerInvestment[] = [];
+
+    // Pattern pour les investissements: "PlayerName: 150 PF (rang 3)"
+    const investmentPattern = /(.+?):\s*(\d+)\s*PF\s*\(rang\s*(\d+)\)/gi;
+
+    let match;
+    while ((match = investmentPattern.exec(ocrText)) !== null) {
+      const [, playerName, forgePointsStr, rankStr] = match;
+
+      investments.push({
+        playerName: playerName.trim(),
+        forgePoints: parseInt(forgePointsStr),
+        rank: parseInt(rankStr),
+      });
+    }
+
+    return investments.sort((a, b) => a.rank - b.rank);
+  }
+
+  /**
+   * Extrait les points de forge du propriétaire
+   * Format attendu : "Propriétaire: 500 PF" ou similar
+   */
+  private parseOwnerForgePoints(ocrText: string): number {
+    // Pattern pour les PF du propriétaire
+    const ownerPattern = /propriétaire.*?(\d+)\s*PF/i;
+    const match = ocrText.match(ownerPattern);
+
+    return match ? parseInt(match[1]) : 0;
   }
 
   /**

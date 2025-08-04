@@ -86,8 +86,16 @@ export interface Config {
 
   // Configuration des joueurs
   players: {
-    excludeList: string[]; // Liste des joueurs à exclure
+    excludeList: string[]; // Liste noire des joueurs à exclure
     scanAllPlayers: boolean; // Si true, parcourt tous les joueurs disponibles
+    nameExtractionRegion: {
+      // Zone pour extraire le nom du joueur à chaque position
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      horizontalSpacing: number; // Espacement horizontal entre les noms
+    };
     cardLayout: {
       startX: number; // Position X de la première carte
       startY: number; // Position Y de la première carte
@@ -100,6 +108,27 @@ export interface Config {
         width: number; // Largeur du bouton
         height: number; // Hauteur du bouton
       };
+    };
+  };
+
+  // Configuration des monuments et récompenses
+  monument: {
+    rewardIcons: {
+      baseX: number; // Position X de base (alignement vertical)
+      baseY: number; // Position Y de la première icône
+      verticalSpacing: number; // Espacement vertical entre les icônes
+    };
+    tooltipRegion: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
+    investmentsRegion: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
     };
   };
 
@@ -188,11 +217,18 @@ export const defaultConfig: Config = {
   },
   players: {
     excludeList: [
-      // Exemples de joueurs à exclure
+      // Exemples de joueurs à exclure (liste noire)
       // 'JoueurAEviter1',
       // 'JoueurAEviter2',
     ],
     scanAllPlayers: false, // Mode séquentiel par défaut (plus fiable)
+    nameExtractionRegion: {
+      x: 280, // Position X du premier nom
+      y: 890, // Position Y (fixe pour alignement horizontal)
+      width: 107, // Largeur de la zone du nom (plus petite pour horizontal)
+      height: 22, // Hauteur de la zone du nom
+      horizontalSpacing: 9, // Espacement horizontal entre les noms (basé sur cardLayout.spacing + cardWidth)
+    },
     cardLayout: {
       startX: 279,
       startY: 892,
@@ -205,6 +241,25 @@ export const defaultConfig: Config = {
         width: 20, // Largeur du bouton "Grands Monuments"
         height: 20, // Hauteur du bouton "Grands Monuments"
       },
+    },
+  },
+  monument: {
+    rewardIcons: {
+      baseX: 600, // Position X fixe (alignement vertical) - À calibrer
+      baseY: 300, // Position Y de la première icône - À calibrer
+      verticalSpacing: 60, // Espacement vertical entre les places
+    },
+    tooltipRegion: {
+      x: 400,
+      y: 200,
+      width: 250,
+      height: 120,
+    },
+    investmentsRegion: {
+      x: 200,
+      y: 400,
+      width: 400,
+      height: 300,
     },
   },
   logging: {

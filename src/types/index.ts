@@ -8,6 +8,43 @@ export interface MonumentPlace {
   playerName?: string; // Nom du joueur actuellement à cette place
   isAvailable: boolean; // Si la place est disponible pour investissement
   currentInvestment?: number; // Montant actuellement investi (si applicable)
+  rewards?: RewardItem[]; // Récompenses associées à cette place
+}
+
+/**
+ * Représente une récompense pour une place de monument
+ */
+export interface RewardItem {
+  type: 'medal' | 'blueprint' | 'forge_points';
+  quantity: number;
+  description: string; // "+100 Points Forge", "+100 Médailles", "+10 Plans"
+}
+
+/**
+ * Données d'investissement dans un monument
+ */
+export interface MonumentInvestmentData {
+  ownerName: string; // Nom du propriétaire du monument
+  ownerForgePoints: number; // PF du propriétaire
+  playerInvestments: PlayerInvestment[]; // Investissements des autres joueurs
+}
+
+/**
+ * Investissement d'un joueur dans un monument
+ */
+export interface PlayerInvestment {
+  playerName: string;
+  forgePoints: number;
+  rank: number;
+}
+
+/**
+ * Récompenses d'une place avec coordonnées pour hover
+ */
+export interface PlaceReward {
+  position: number;
+  rewards: RewardItem[];
+  coordinatesForHover: { x: number; y: number };
 }
 
 /**
@@ -19,6 +56,7 @@ export interface MonumentData {
   timestamp: Date;
   hasExistingInvestments: boolean; // Si le joueur a déjà des investissements
   totalInvested?: number; // Total des PF déjà investis
+  investmentData?: MonumentInvestmentData; // Données d'investissements détaillées
 }
 
 /**

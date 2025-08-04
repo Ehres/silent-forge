@@ -5,7 +5,7 @@ import { OpportunityDetector } from './opportunity-detector';
 import { OCREnhancementService } from './ocr-enhancement';
 import { Logger } from '../utils/logger';
 import { loadConfig } from '../config/config';
-import { MonumentData, Opportunity } from '../types';
+import { MonumentData, Opportunity, RewardItem } from '../types';
 import {
   getHumanLikeClickPosition,
   HumanClickSimulator,
@@ -341,18 +341,24 @@ export class GameNavigationService {
           `👤 Traitement du joueur à la position ${playerIndex + 1}...`
         );
 
-        // Vérifier si le joueur existe à cette position
-        // @TODO: Implémenter la logique de vérification du joueur
-        // const playerExists = await this.clickOnPlayerAtPosition(playerIndex);
-        // if (!playerExists) {
-        //   this.logger.info(
-        //     `   ℹ️ Pas de joueur à la position ${playerIndex + 1}`
-        //   );
-        //   break; // Fin de la page
-        // }
+        // 1. Extraire le nom du joueur via OCR
+        const playerName = await this.extractPlayerNameAtPosition(playerIndex);
 
-        // Traiter ce joueur (sans connaître son nom)
-        await this.processCurrentPlayer(playerIndex + 1);
+        if (!playerName) {
+          this.logger.info(`ℹ️ Pas de joueur à la position ${playerIndex + 1}`);
+          break; // Fin de la page
+        }
+
+        // 2. Vérifier la liste d'exclusion (liste noire)
+        if (this.isPlayerExcluded(playerName)) {
+          this.logger.info(`🚫 Joueur exclu: ${playerName}`);
+          continue; // Passer au joueur suivant
+        }
+
+        this.logger.info(`✅ Traitement du joueur: ${playerName}`);
+
+        // 3. Traiter ce joueur avec son nom
+        await this.processCurrentPlayer(playerIndex + 1, playerName);
         playersProcessed++;
 
         // Délai entre joueurs pour paraître humain
@@ -409,13 +415,118 @@ export class GameNavigationService {
   }
 
   /**
+   * Extrait le nom du joueur à une position spécifique via OCR
+   */
+  private async extractPlayerNameAtPosition(
+    playerIndex: number
+  ): Promise<string | null> {
+    try {
+      this.logger.debug(
+        `🔍 Extraction nom joueur position ${playerIndex + 1}...`
+      );
+
+      // Calculer la zone OCR pour ce joueur (alignement horizontal)
+      const nameRegion = this.config.players.nameExtractionRegion;
+      const ocrRegion = {
+        x: nameRegion.x + (playerIndex * nameRegion.horizontalSpacing),
+        y: nameRegion.y, // Y fixe pour alignement horizontal
+        width: nameRegion.width,
+        height: nameRegion.height,
+      };
+
+      // Capturer la zone du nom
+      const nameScreenshot = await this.screenCapture.captureScreen({
+        region: ocrRegion,
+      });
+
+      // Sauvegarder pour debug si activé
+      if (this.config.debug.saveCaptures) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `player_name_${playerIndex + 1}_${timestamp}`;
+        await this.screenCapture.saveCapture(nameScreenshot, filename);
+      }
+
+      // OCR pour extraire le nom
+      const playerName = await this.extractPlayerNameFromImage(nameScreenshot);
+
+      if (!playerName || playerName.trim().length === 0) {
+        this.logger.debug(
+          `❌ Nom joueur position ${playerIndex + 1} non trouvé ou vide`
+        );
+        return null;
+      }
+
+      this.logger.debug(
+        `✅ Nom joueur position ${playerIndex + 1}: "${playerName}"`
+      );
+      return playerName.trim();
+    } catch (error) {
+      this.logger.error(
+        `❌ Erreur extraction nom joueur position ${playerIndex + 1}:`,
+        error
+      );
+      return null; // En cas d'erreur, passer au joueur suivant
+    }
+  }
+
+  /**
+   * Extrait le nom du joueur depuis une image via OCR
+   */
+  private async extractPlayerNameFromImage(image: any): Promise<string | null> {
+    try {
+      // Configuration OCR optimisée pour les noms de joueurs
+      const ocrConfig = {
+        lang: 'eng+fra',
+        options: {
+          tessedit_char_whitelist:
+            'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ0123456789_-',
+          tessedit_pageseg_mode: 8, // Single word
+          preserve_interword_spaces: 0,
+        },
+      };
+
+      const { createWorker, PSM } = await import('tesseract.js');
+      const worker = await createWorker(ocrConfig.lang);
+
+      await worker.setParameters({
+        tessedit_char_whitelist: ocrConfig.options.tessedit_char_whitelist,
+        tessedit_pageseg_mode: PSM.SINGLE_WORD,
+        preserve_interword_spaces: '0',
+      });
+
+      const { data } = await worker.recognize(image);
+      await worker.terminate();
+
+      // Nettoyer le texte extrait
+      const cleanedText = data.text
+        .replace(/[^\w\-\u00C0-\u017F]/g, '') // Garder seulement lettres, chiffres, tirets et accents
+        .trim();
+
+      return cleanedText.length > 0 ? cleanedText : null;
+    } catch (error) {
+      this.logger.error('❌ Erreur OCR extraction nom joueur:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Vérifie si un joueur est dans la liste d'exclusion (liste noire)
+   */
+  private isPlayerExcluded(playerName: string): boolean {
+    const excludeList = this.config.players.excludeList || [];
+    return excludeList.includes(playerName);
+  }
+
+  /**
    * Traite le joueur actuellement sélectionné (workflow complet)
    */
-  private async processCurrentPlayer(playerPosition: number): Promise<void> {
+  private async processCurrentPlayer(
+    playerPosition: number,
+    playerName?: string
+  ): Promise<void> {
     try {
-      this.logger.info(
-        `🏛️ Ouverture des monuments pour joueur position ${playerPosition}...`
-      );
+      const displayName = playerName || `position ${playerPosition}`;
+      this.logger.info(`🏛️ Ouverture des monuments pour ${displayName}...`);
 
       // 1. Ouvrir la liste des grands monuments (avec position dynamique)
       await this.openMonumentsList(playerPosition - 1); // playerPosition est 1-based, index est 0-based
@@ -424,9 +535,7 @@ export class GameNavigationService {
       const monuments = await this.identifyInvestedMonuments();
 
       if (monuments.length === 0) {
-        this.logger.info(
-          `   ℹ️ Aucun monument ciblé (position ${playerPosition})`
-        );
+        this.logger.info(`   ℹ️ Aucun monument ciblé (${displayName})`);
         return;
       }
 
@@ -434,13 +543,13 @@ export class GameNavigationService {
         `   🏛️ ${monuments.length} monument(s) ciblé(s) détecté(s) (avec investissements mais sans les miens)`
       );
 
-      // 3. Traiter chaque monument
+      // 3. Traiter chaque monument avec le nom du propriétaire
       for (const monument of monuments) {
-        await this.processMonument(monument);
+        await this.processMonument(monument, playerName);
       }
     } catch (error) {
       this.logger.error(
-        `❌ Erreur traitement joueur position ${playerPosition}:`,
+        `❌ Erreur traitement ${playerName || `position ${playerPosition}`}:`,
         error
       );
     }
@@ -767,7 +876,10 @@ export class GameNavigationService {
   /**
    * Traiter un monument spécifique
    */
-  async processMonument(monument: InvestedMonument): Promise<void> {
+  async processMonument(
+    monument: InvestedMonument,
+    ownerName?: string
+  ): Promise<void> {
     this.logger.info(`🏛️ Traitement du monument: ${monument.name}`);
 
     try {
@@ -778,8 +890,8 @@ export class GameNavigationService {
       );
       await this.automationService.randomDelay(1500, 2500);
 
-      // 2. Capturer et analyser les places disponibles
-      const monumentData = await this.analyzeMonumentOpportunities();
+      // 2. Capturer et analyser les places disponibles avec le nom du propriétaire
+      const monumentData = await this.analyzeMonumentOpportunities(ownerName);
 
       // 3. Identifier les opportunités
       const opportunities =
@@ -812,7 +924,9 @@ export class GameNavigationService {
   /**
    * Analyser les opportunités dans un monument ouvert
    */
-  async analyzeMonumentOpportunities(): Promise<MonumentData> {
+  async analyzeMonumentOpportunities(
+    ownerName?: string
+  ): Promise<MonumentData> {
     this.logger.info('🔍 Analyse des opportunités du monument...');
 
     // Capturer la zone des places du monument
@@ -825,11 +939,195 @@ export class GameNavigationService {
       await this.screenCapture.saveCapture(screenshot, filename);
     }
 
-    // Analyser avec OCR
-    const monumentData = await this.ocrService.analyzeMonument(screenshot);
+    // Analyser avec OCR en passant le nom du propriétaire
+    const monumentData = await this.ocrService.analyzeMonument(
+      screenshot,
+      ownerName
+    );
+
+    // Pour chaque place, extraire les récompenses par hover
+    for (const place of monumentData.places) {
+      try {
+        place.rewards = await this.extractRewardsForPlace(place.position);
+      } catch (error) {
+        this.logger.error(
+          `❌ Erreur extraction récompenses place ${place.position}:`,
+          error
+        );
+        place.rewards = []; // Valeur par défaut si l'extraction échoue
+      }
+    }
 
     this.logger.info(`📊 ${monumentData.places.length} place(s) analysée(s)`);
     return monumentData;
+  }
+
+  /**
+   * Extrait les récompenses pour une place spécifique via hover
+   */
+  private async extractRewardsForPlace(
+    placePosition: number
+  ): Promise<RewardItem[]> {
+    try {
+      this.logger.debug(`🎁 Extraction récompenses place ${placePosition}...`);
+
+      // 1. Calculer position de l'icône récompense (alignement vertical)
+      const rewardIconCoords = this.calculateRewardIconPosition(placePosition);
+
+      // 2. Hover sur l'icône
+      await this.automationService.moveMouseToPosition(
+        rewardIconCoords.x,
+        rewardIconCoords.y
+      );
+      await this.automationService.randomDelay(500, 1000);
+
+      // 3. Capturer tooltip (position dynamique basée sur la souris)
+      const tooltipScreenshot = await this.captureTooltipAtMousePosition();
+
+      // 4. OCR de la tooltip
+      const rewards = await this.parseRewardsFromTooltip(tooltipScreenshot);
+
+      // 5. Déplacer la souris ailleurs pour fermer la tooltip
+      await this.automationService.moveMouseAway();
+
+      this.logger.debug(
+        `✅ ${rewards.length} récompense(s) extraite(s) pour place ${placePosition}`
+      );
+      return rewards;
+    } catch (error) {
+      this.logger.error(
+        `❌ Erreur extraction récompenses place ${placePosition}:`,
+        error
+      );
+      return []; // Retourner un tableau vide en cas d'erreur
+    }
+  }
+
+  /**
+   * Calcule la position de l'icône de récompense pour une place (alignement vertical)
+   */
+  private calculateRewardIconPosition(placePosition: number): {
+    x: number;
+    y: number;
+  } {
+    const baseX = this.config.monument.rewardIcons.baseX;
+    const baseY = this.config.monument.rewardIcons.baseY;
+    const verticalSpacing = this.config.monument.rewardIcons.verticalSpacing;
+
+    return {
+      x: baseX, // X fixe pour alignement vertical
+      y: baseY + (placePosition - 1) * verticalSpacing,
+    };
+  }
+
+  /**
+   * Capture la tooltip à la position actuelle de la souris
+   */
+  private async captureTooltipAtMousePosition(): Promise<any> {
+    try {
+      // La tooltip apparaît près de la position actuelle de la souris
+      const mousePos = await this.automationService.getMousePosition();
+
+      const tooltipRegion = {
+        x: mousePos.x + 10, // Décalage standard des tooltips
+        y: mousePos.y - 50,
+        width: this.config.monument.tooltipRegion.width,
+        height: this.config.monument.tooltipRegion.height,
+      };
+
+      // Attendre que la tooltip apparaisse
+      await this.automationService.randomDelay(300, 500);
+
+      return await this.screenCapture.captureScreen({ region: tooltipRegion });
+    } catch (error) {
+      this.logger.error('❌ Erreur capture tooltip:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Parse les récompenses depuis une tooltip via OCR
+   */
+  private async parseRewardsFromTooltip(
+    tooltipImage: any
+  ): Promise<RewardItem[]> {
+    try {
+      const ocrText = await this.extractTextFromTooltip(tooltipImage);
+      const rewards: RewardItem[] = [];
+
+      // Pattern: "+100 Points Forge"
+      const forgePointsPattern = /\+(\d+)\s+Points?\s+Forge/i;
+      const forgeMatch = ocrText.match(forgePointsPattern);
+      if (forgeMatch) {
+        rewards.push({
+          type: 'forge_points',
+          quantity: parseInt(forgeMatch[1]),
+          description: forgeMatch[0],
+        });
+      }
+
+      // Pattern: "+100 Médailles"
+      const medalPattern = /\+(\d+)\s+Médailles?/i;
+      const medalMatch = ocrText.match(medalPattern);
+      if (medalMatch) {
+        rewards.push({
+          type: 'medal',
+          quantity: parseInt(medalMatch[1]),
+          description: medalMatch[0],
+        });
+      }
+
+      // Pattern: "+10 Plans"
+      const blueprintPattern = /\+(\d+)\s+Plans?/i;
+      const blueprintMatch = ocrText.match(blueprintPattern);
+      if (blueprintMatch) {
+        rewards.push({
+          type: 'blueprint',
+          quantity: parseInt(blueprintMatch[1]),
+          description: blueprintMatch[0],
+        });
+      }
+
+      return rewards;
+    } catch (error) {
+      this.logger.error('❌ Erreur parsing récompenses tooltip:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Extrait le texte depuis une image de tooltip via OCR
+   */
+  private async extractTextFromTooltip(tooltipImage: any): Promise<string> {
+    try {
+      // Configuration OCR optimisée pour les tooltips
+      const ocrConfig = {
+        lang: 'eng+fra',
+        options: {
+          tessedit_char_whitelist:
+            'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ0123456789+/() -',
+          tessedit_pageseg_mode: 6, // Uniform block of text
+          preserve_interword_spaces: 1,
+        },
+      };
+
+      const { createWorker, PSM } = await import('tesseract.js');
+      const worker = await createWorker(ocrConfig.lang);
+
+      await worker.setParameters({
+        tessedit_char_whitelist: ocrConfig.options.tessedit_char_whitelist,
+        tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
+        preserve_interword_spaces: '1',
+      });
+
+      const { data } = await worker.recognize(tooltipImage);
+      await worker.terminate();
+
+      return data.text.trim();
+    } catch (error) {
+      this.logger.error('❌ Erreur OCR tooltip:', error);
+      return '';
+    }
   }
 
   /**

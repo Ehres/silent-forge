@@ -171,4 +171,46 @@ export class AutomationService {
     await this.randomDelay(1000, 1500);
     this.logger.debug('✅ Retour au menu principal terminé');
   }
+
+  /**
+   * Déplacement de souris vers une position avec mouvement humain
+   */
+  async moveMouseToPosition(x: number, y: number): Promise<void> {
+    try {
+      await this.moveMouseHumanlike(x, y);
+    } catch (error) {
+      this.logger.error('Erreur lors du déplacement de souris:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Déplace la souris vers une position "neutre" pour fermer les tooltips
+   */
+  async moveMouseAway(): Promise<void> {
+    try {
+      // Déplacer vers une zone neutre (coin supérieur gauche par exemple)
+      await this.moveMouseHumanlike(50, 50);
+      await this.randomDelay(200, 400);
+    } catch (error) {
+      this.logger.error('Erreur lors du déplacement de souris (away):', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère la position actuelle de la souris
+   */
+  async getMousePosition(): Promise<{ x: number; y: number }> {
+    try {
+      const position = await mouse.getPosition();
+      return { x: position.x, y: position.y };
+    } catch (error) {
+      this.logger.error(
+        'Erreur lors de la récupération de la position de souris:',
+        error
+      );
+      throw error;
+    }
+  }
 }
