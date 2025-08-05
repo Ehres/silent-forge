@@ -477,9 +477,11 @@ export class GameNavigationService {
         const path = await import('path');
         imagePath = path.join(process.cwd(), 'captures', `${filename}.png`);
 
-        // Extraire tous les noms via OCR en utilisant le chemin de fichier
-        const playerNames =
-          await this.extractPlayerNamesFromFullImage(imagePath);
+        // Extraire tous les noms via OCR en utilisant le service dédié
+        const playerNames = await this.ocrService.extractPlayerNamesFromImage(
+          imagePath,
+          playersPerPage
+        );
 
         this.logger.debug(
           `✅ ${playerNames.length} nom(s) de joueur(s) extraits`
@@ -494,9 +496,11 @@ export class GameNavigationService {
         const path = await import('path');
         imagePath = path.join(process.cwd(), 'captures', `${filename}.png`);
 
-        // Extraire les noms via OCR
-        const playerNames =
-          await this.extractPlayerNamesFromFullImage(imagePath);
+        // Extraire les noms via OCR en utilisant le service dédié
+        const playerNames = await this.ocrService.extractPlayerNamesFromImage(
+          imagePath,
+          playersPerPage
+        );
 
         // Supprimer le fichier temporaire
         try {
@@ -516,88 +520,6 @@ export class GameNavigationService {
         "❌ Erreur lors de l'extraction des noms de joueurs:",
         error
       );
-      return [];
-    }
-  }
-
-  /**
-   * Extrait les noms des joueurs depuis une image complète via OCR
-   */
-  private async extractPlayerNamesFromFullImage(
-    imagePath: string
-  ): Promise<string[]> {
-    try {
-      // Configuration OCR optimisée pour plusieurs mots alignés horizontalement
-      const ocrConfig = {
-        lang: 'eng+fra',
-        options: {
-          tessedit_char_whitelist:
-            'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ0123456789_- ',
-          tessedit_pageseg_mode: 6, // Uniform block of text
-          preserve_interword_spaces: 1,
-        },
-      };
-
-      this.logger.debug("🧠 Lancement de l'OCR pour extraction des noms...");
-
-      const { createWorker, PSM } = await import('tesseract.js');
-      const worker = await createWorker(ocrConfig.lang);
-
-      await worker.setParameters({
-        tessedit_char_whitelist: ocrConfig.options.tessedit_char_whitelist,
-        tessedit_pageseg_mode: PSM.SINGLE_LINE,
-        preserve_interword_spaces: '1',
-      });
-
-      // Utiliser le chemin de fichier avec Tesseract (évite les erreurs "truncated file")
-      const { data } = await worker.recognize(imagePath);
-      await worker.terminate();
-
-      this.logger.debug(`📝 Texte OCR brut: "${data.text}"`);
-
-      // Parser le texte pour extraire les noms individuels
-      const playerNames = this.parsePlayerNamesFromOCRText(data.text);
-
-      return playerNames;
-    } catch (error) {
-      this.logger.error('❌ Erreur OCR extraction noms joueurs:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Parse le texte OCR pour extraire les noms individuels des joueurs
-   */
-  private parsePlayerNamesFromOCRText(ocrText: string): string[] {
-    try {
-      const playerNames: string[] = [];
-
-      // Diviser le texte en mots/tokens potentiels
-      const tokens = ocrText
-        .split(/\s+/) // Diviser par espaces
-        .map((token) => token.trim())
-        .filter((token) => token.length > 0);
-
-      // Filtrer et nettoyer les noms valides
-      for (const token of tokens) {
-        const cleanedName = token
-          .replace(/[^\w\-\u00C0-\u017F]/g, '') // Garder seulement lettres, chiffres, tirets et accents
-          .trim();
-
-        // Vérifier que c'est un nom valide (au moins 2 caractères, pas que des chiffres)
-        if (cleanedName.length >= 2 && !/^\d+$/.test(cleanedName)) {
-          playerNames.push(cleanedName);
-        }
-      }
-
-      // Limiter au nombre maximum de joueurs par page pour éviter les faux positifs
-      const maxPlayers = this.config.ui.pagination.playersPerPage;
-      const finalNames = playerNames.slice(0, maxPlayers);
-
-      this.logger.debug(`🎯 Noms extraits: [${finalNames.join(', ')}]`);
-      return finalNames;
-    } catch (error) {
-      this.logger.error('❌ Erreur parsing noms de joueurs:', error);
       return [];
     }
   }
@@ -926,7 +848,7 @@ export class GameNavigationService {
       }
 
       // Extraire les données du tableau via OCR (utiliser le fichier plutôt que l'objet)
-      const tableData = await this.extractMonumentTableData(
+      const tableData = await this.ocrService.extractMonumentTableData(
         imagePath || screenshot
       );
 
@@ -1145,7 +1067,8 @@ export class GameNavigationService {
     tooltipImage: any
   ): Promise<RewardItem[]> {
     try {
-      const ocrText = await this.extractTextFromTooltip(tooltipImage);
+      const ocrText =
+        await this.ocrService.extractTextFromTooltip(tooltipImage);
       const rewards: RewardItem[] = [];
 
       // Pattern: "+100 Points Forge"
@@ -1185,41 +1108,6 @@ export class GameNavigationService {
     } catch (error) {
       this.logger.error('❌ Erreur parsing récompenses tooltip:', error);
       return [];
-    }
-  }
-
-  /**
-   * Extrait le texte depuis une image de tooltip via OCR
-   */
-  private async extractTextFromTooltip(tooltipImage: any): Promise<string> {
-    try {
-      // Configuration OCR optimisée pour les tooltips
-      const ocrConfig = {
-        lang: 'eng+fra',
-        options: {
-          tessedit_char_whitelist:
-            'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ0123456789+/() -',
-          tessedit_pageseg_mode: 6, // Uniform block of text
-          preserve_interword_spaces: 1,
-        },
-      };
-
-      const { createWorker, PSM } = await import('tesseract.js');
-      const worker = await createWorker(ocrConfig.lang);
-
-      await worker.setParameters({
-        tessedit_char_whitelist: ocrConfig.options.tessedit_char_whitelist,
-        tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
-        preserve_interword_spaces: '1',
-      });
-
-      const { data } = await worker.recognize(tooltipImage);
-      await worker.terminate();
-
-      return data.text.trim();
-    } catch (error) {
-      this.logger.error('❌ Erreur OCR tooltip:', error);
-      return '';
     }
   }
 
@@ -1299,89 +1187,6 @@ export class GameNavigationService {
 
     await this.automationService.randomDelay(1000, 1500);
     this.logger.debug('✅ Retour à la liste des joueurs');
-  }
-
-  /**
-   * Extrait les données du tableau des monuments via OCR
-   */
-  private async extractMonumentTableData(
-    screenshot: any
-  ): Promise<MonumentTableRow[]> {
-    this.logger.debug('📊 Extraction des données du tableau des monuments...');
-
-    try {
-      // Si pas de screenshot (mode test), utiliser directement les données simulées
-      if (!screenshot) {
-        this.logger.debug(
-          '⚠️ Pas de screenshot fourni - utilisation des données simulées'
-        );
-        return this.getSimulatedMonumentData();
-      }
-
-      // Convertir l'image pour Tesseract si nécessaire
-      const imageData = await this.prepareImageForOCR(screenshot);
-
-      // Configuration OCR optimisée pour les tableaux
-      const ocrConfig = {
-        lang: 'eng+fra', // Support français et anglais
-        options: {
-          tessedit_char_whitelist:
-            'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ0123456789/() -',
-          tessedit_pageseg_mode: 6, // Assume uniform block of text
-          preserve_interword_spaces: 1,
-        },
-      };
-
-      this.logger.debug('🧠 Lancement de la reconnaissance OCR...');
-
-      // Utiliser Tesseract.js pour extraire le texte
-      const { createWorker, PSM } = await import('tesseract.js');
-      const worker = await createWorker(ocrConfig.lang);
-
-      await worker.setParameters({
-        tessedit_char_whitelist: ocrConfig.options.tessedit_char_whitelist,
-        tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
-        preserve_interword_spaces: '1',
-      });
-
-      const { data } = await worker.recognize(imageData);
-      await worker.terminate();
-
-      this.logger.debug(`📝 Texte OCR extrait: ${data.text.length} caractères`);
-
-      // Parser le texte en lignes de tableau
-      const tableRows = await this.parseOCRTextToTableRows(data);
-
-      // Appliquer l'amélioration OCR sur chaque ligne
-      const enhancedTableRows = tableRows.map((row) => {
-        const enhancedData = this.ocrEnhancement.enhanceSingleMonument({
-          name: row.name,
-          level: row.level,
-          progression: `${row.progression.current}/${row.progression.maximum}`,
-        });
-
-        return {
-          ...row,
-          name: enhancedData.name,
-          level: enhancedData.level,
-        };
-      });
-
-      this.logger.debug(
-        `📊 ${enhancedTableRows.length} ligne(s) de monuments extraite(s) et améliorée(s)`
-      );
-
-      return enhancedTableRows;
-    } catch (error) {
-      this.logger.error(
-        "❌ Erreur lors de l'extraction OCR des données du tableau:",
-        error
-      );
-
-      // Fallback vers les données simulées en cas d'erreur OCR
-      this.logger.warn('⚠️ Utilisation des données simulées en fallback');
-      return this.getSimulatedMonumentData();
-    }
   }
 
   /**
@@ -1541,7 +1346,8 @@ export class GameNavigationService {
       const mockScreenshot = null; // Placeholder
 
       // Extraire les données (utilisera les données simulées)
-      const tableData = await this.extractMonumentTableData(mockScreenshot);
+      const tableData =
+        await this.ocrService.extractMonumentTableData(mockScreenshot);
 
       this.logger.info(
         `📊 ${tableData.length} monument(s) extraits du tableau:`
@@ -1577,183 +1383,5 @@ export class GameNavigationService {
     } catch (error) {
       this.logger.error('❌ Erreur lors du test de filtrage:', error);
     }
-  }
-
-  /**
-   * Prépare l'image pour l'OCR en appliquant des prétraitements
-   */
-  private async prepareImageForOCR(screenshot: any): Promise<any> {
-    this.logger.debug("🖼️ Préparation de l'image pour OCR...");
-
-    try {
-      // Si c'est un string (chemin de fichier) - priorité car plus fiable
-      if (typeof screenshot === 'string') {
-        this.logger.debug('✅ Utilisation du chemin de fichier pour OCR');
-        return screenshot;
-      }
-
-      // Si c'est déjà un Buffer ou autre format compatible
-      if (Buffer.isBuffer(screenshot)) {
-        this.logger.debug('✅ Image déjà en format Buffer');
-        return screenshot;
-      }
-
-      // Si l'image vient de @nut-tree-fork/nut-js (objet Image)
-      if (
-        screenshot &&
-        screenshot.data &&
-        screenshot.width &&
-        screenshot.height
-      ) {
-        this.logger.debug(
-          '📸 Image @nut-tree-fork/nut-js détectée, utilisation directe pour Tesseract'
-        );
-
-        // Tesseract.js peut parfois accepter directement les données d'image raw
-        // Essayons d'abord de retourner l'objet tel quel
-        this.logger.debug("✅ Utilisation directe de l'objet Image pour OCR");
-        return screenshot;
-      }
-
-      // Fallback - essayer de retourner tel quel
-      this.logger.debug("⚠️ Format d'image non reconnu, tentative directe");
-      return screenshot;
-    } catch (error) {
-      this.logger.error("❌ Erreur lors de la préparation d'image:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Convertit une image @nut-tree-fork/nut-js vers Jimp
-   * (Copie de la méthode dans ScreenCapture pour éviter les dépendances circulaires)
-   */
-  private async createJimpFromNutImage(nutImage: any): Promise<any> {
-    const { width, height, data, channels } = nutImage;
-
-    // Créer un buffer RGBA standard (4 channels)
-    const rgbaBuffer = Buffer.alloc(width * height * 4);
-
-    for (let i = 0; i < width * height; i++) {
-      const srcIndex = i * channels;
-      const dstIndex = i * 4;
-
-      if (channels >= 3) {
-        rgbaBuffer[dstIndex] = data[srcIndex]; // R
-        rgbaBuffer[dstIndex + 1] = data[srcIndex + 1]; // G
-        rgbaBuffer[dstIndex + 2] = data[srcIndex + 2]; // B
-        rgbaBuffer[dstIndex + 3] = channels === 4 ? data[srcIndex + 3] : 255; // A
-      } else if (channels === 1) {
-        // Grayscale vers RGBA
-        const gray = data[srcIndex];
-        rgbaBuffer[dstIndex] = gray; // R
-        rgbaBuffer[dstIndex + 1] = gray; // G
-        rgbaBuffer[dstIndex + 2] = gray; // B
-        rgbaBuffer[dstIndex + 3] = 255; // A
-      }
-    }
-
-    // Utiliser la méthode create de Jimp avec un objet de configuration
-    const jimp = await import('jimp');
-    return new jimp.Jimp({
-      data: rgbaBuffer,
-      width,
-      height,
-    });
-  }
-
-  /**
-   * Parse le texte OCR brut en lignes de tableau structurées
-   */
-  private async parseOCRTextToTableRows(
-    ocrData: any
-  ): Promise<MonumentTableRow[]> {
-    this.logger.debug('📝 Parsing du texte OCR en lignes de tableau...');
-
-    try {
-      const rows: MonumentTableRow[] = [];
-      const lines = ocrData.text
-        .split('\n')
-        .filter((line: string) => line.trim().length > 0);
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-
-        // Ignorer les lignes d'en-tête ou vides
-        if (this.isTableHeaderLine(line)) {
-          continue;
-        }
-
-        const parsedRow = this.parseMonumentTableRow(line, i);
-        if (parsedRow) {
-          rows.push(parsedRow);
-        }
-      }
-
-      this.logger.debug(`📊 ${rows.length} ligne(s) de monuments parsée(s)`);
-      return rows;
-    } catch (error) {
-      this.logger.error('❌ Erreur lors du parsing OCR:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Vérifie si une ligne est un en-tête de tableau
-   */
-  private isTableHeaderLine(line: string): boolean {
-    const headerKeywords = [
-      'nom',
-      'niveau',
-      'progression',
-      'points',
-      'rang',
-      'activité',
-      'name',
-      'level',
-    ];
-    const lowerLine = line.toLowerCase();
-
-    return headerKeywords.some((keyword) => lowerLine.includes(keyword));
-  }
-
-  /**
-   * Données simulées pour fallback
-   */
-  private getSimulatedMonumentData(): MonumentTableRow[] {
-    return [
-      {
-        name: 'Arc de Triomphe',
-        level: 12,
-        progression: { current: 450, maximum: 1000 },
-        myInvestment: null,
-        myRank: null,
-        activityButtonPosition: { x: 1150, y: 500, width: 130, height: 22 },
-      },
-      {
-        name: 'Tour Eiffel',
-        level: 15,
-        progression: { current: 200, maximum: 800 },
-        myInvestment: 50,
-        myRank: 3,
-        activityButtonPosition: { x: 1150, y: 540, width: 130, height: 22 },
-      },
-      {
-        name: 'Statue de la Liberté',
-        level: 8,
-        progression: { current: 0, maximum: 600 },
-        myInvestment: null,
-        myRank: null,
-        activityButtonPosition: { x: 1150, y: 580, width: 130, height: 22 },
-      },
-      {
-        name: 'Colisée',
-        level: 18,
-        progression: { current: 750, maximum: 1200 },
-        myInvestment: null,
-        myRank: null,
-        activityButtonPosition: { x: 1150, y: 620, width: 130, height: 22 },
-      },
-    ];
   }
 }
