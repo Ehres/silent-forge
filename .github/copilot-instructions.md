@@ -100,6 +100,8 @@ All services use try-catch with Logger.error() and rethrow. Recent additions inc
 - Reward extraction failures → continue with empty rewards array
 - Player filtering → log exclusions but continue processing
 
+**CRITICAL OCR FIX**: Always pass file paths (string) to Tesseract.js instead of image objects to avoid "truncated file" errors. Save captures first, then use the file path for OCR processing.
+
 ### Logging Convention
 
 Extensive emoji-prefixed logging for user experience:

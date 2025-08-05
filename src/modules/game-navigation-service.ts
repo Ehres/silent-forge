@@ -4,7 +4,7 @@ import { OCRService } from './ocr-service';
 import { OpportunityDetector } from './opportunity-detector';
 import { OCREnhancementService } from './ocr-enhancement';
 import { Logger } from '../utils/logger';
-import { loadConfig } from '../config/config';
+import { Config, loadConfig } from '../config/config';
 import { MonumentData, Opportunity, RewardItem } from '../types';
 import {
   getHumanLikeClickPosition,
@@ -80,7 +80,7 @@ export class GameNavigationService {
   private opportunityDetector: OpportunityDetector;
   private ocrEnhancement: OCREnhancementService;
   private logger: Logger;
-  private config: any;
+  private config: Config;
   private clickSimulator: HumanClickSimulator;
 
   constructor() {
@@ -335,45 +335,67 @@ export class GameNavigationService {
     const playersPerPage = this.config.ui.pagination.playersPerPage;
     let playersProcessed = 0;
 
-    for (let playerIndex = 0; playerIndex < playersPerPage; playerIndex++) {
-      try {
-        this.logger.info(
-          `👤 Traitement du joueur à la position ${playerIndex + 1}...`
-        );
+    try {
+      // 1. Extraire tous les noms des joueurs de la page en une seule fois
+      this.logger.info(
+        '📋 Extraction de la liste complète des joueurs de la page...'
+      );
+      const playerNames = await this.extractAllPlayerNamesFromCurrentPage();
 
-        // 1. Extraire le nom du joueur via OCR
-        const playerName = await this.extractPlayerNameAtPosition(playerIndex);
-
-        if (!playerName) {
-          this.logger.info(`ℹ️ Pas de joueur à la position ${playerIndex + 1}`);
-          break; // Fin de la page
-        }
-
-        // 2. Vérifier la liste d'exclusion (liste noire)
-        if (this.isPlayerExcluded(playerName)) {
-          this.logger.info(`🚫 Joueur exclu: ${playerName}`);
-          continue; // Passer au joueur suivant
-        }
-
-        this.logger.info(`✅ Traitement du joueur: ${playerName}`);
-
-        // 3. Traiter ce joueur avec son nom
-        await this.processCurrentPlayer(playerIndex + 1, playerName);
-        playersProcessed++;
-
-        // Délai entre joueurs pour paraître humain
-        await this.automationService.randomDelay(2000, 4000);
-
-        // Retourner à la liste des joueurs pour le suivant
-        await this.returnToPlayersList();
-      } catch (error) {
-        this.logger.error(
-          `❌ Erreur joueur position ${playerIndex + 1}:`,
-          error
-        );
-        // Continuer avec le joueur suivant
-        await this.returnToPlayersList();
+      if (playerNames.length === 0) {
+        this.logger.info('ℹ️ Aucun joueur trouvé sur cette page');
+        return 0;
       }
+
+      this.logger.info(
+        `👥 ${playerNames.length} joueur(s) détecté(s) sur la page`
+      );
+
+      // 2. Traiter chaque joueur individuellement
+      for (
+        let playerIndex = 0;
+        playerIndex < playerNames.length;
+        playerIndex++
+      ) {
+        try {
+          const playerName = playerNames[playerIndex];
+
+          this.logger.info(
+            `👤 Traitement du joueur ${playerIndex + 1}/${playerNames.length}: ${playerName}`
+          );
+
+          // Vérifier la liste d'exclusion (liste noire)
+          if (this.isPlayerExcluded(playerName)) {
+            this.logger.info(`🚫 Joueur exclu: ${playerName}`);
+            continue; // Passer au joueur suivant
+          }
+
+          this.logger.info(`✅ Traitement du joueur: ${playerName}`);
+
+          // Traiter ce joueur avec son nom
+          await this.processCurrentPlayer(playerIndex + 1, playerName);
+          playersProcessed++;
+
+          // Délai entre joueurs pour paraître humain
+          await this.automationService.randomDelay(2000, 4000);
+
+          // Retourner à la liste des joueurs pour le suivant
+          await this.returnToPlayersList();
+        } catch (error) {
+          this.logger.error(
+            `❌ Erreur joueur ${playerIndex + 1} (${playerNames[playerIndex]}):`,
+            error
+          );
+          // Continuer avec le joueur suivant
+          await this.returnToPlayersList();
+        }
+      }
+    } catch (error) {
+      this.logger.error(
+        "❌ Erreur lors de l'extraction des joueurs de la page:",
+        error
+      );
+      return 0;
     }
 
     return playersProcessed;
@@ -415,6 +437,172 @@ export class GameNavigationService {
   }
 
   /**
+   * Extrait tous les noms des joueurs de la page actuelle en une seule capture
+   */
+  private async extractAllPlayerNamesFromCurrentPage(): Promise<string[]> {
+    try {
+      this.logger.debug('📸 Capture de la zone complète des joueurs...');
+
+      // Calculer une zone élargie qui couvre tous les joueurs
+      const nameRegion = this.config.players.nameExtractionRegion;
+      const playersPerPage = this.config.ui.pagination.playersPerPage;
+
+      // Zone élargie couvrant tous les joueurs horizontalement
+      const fullPlayersRegion = {
+        x: Math.max(0, nameRegion.x), // Marge à gauche
+        y: Math.max(0, nameRegion.y), // Marge en haut
+        width:
+          playersPerPage * nameRegion.width +
+          nameRegion.horizontalSpacing * (playersPerPage - 1), // Largeur totale + marges
+        height: nameRegion.height, // Hauteur + marges
+      };
+
+      this.logger.debug(
+        `🖼️ Zone de capture élargie: (${fullPlayersRegion.x}, ${fullPlayersRegion.y}) ${fullPlayersRegion.width}x${fullPlayersRegion.height}`
+      );
+
+      // Capturer la zone complète
+      const playersScreenshot = await this.screenCapture.captureScreen({
+        region: fullPlayersRegion,
+      });
+
+      // Sauvegarder pour debug si activé ET pour utiliser le chemin de fichier avec OCR
+      let imagePath: string | null = null;
+      if (this.config.debug.saveCaptures) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `all_players_names_${timestamp}`;
+        await this.screenCapture.saveCapture(playersScreenshot, filename);
+
+        // Construire le chemin complet du fichier sauvegardé pour OCR
+        const path = await import('path');
+        imagePath = path.join(process.cwd(), 'captures', `${filename}.png`);
+
+        // Extraire tous les noms via OCR en utilisant le chemin de fichier
+        const playerNames =
+          await this.extractPlayerNamesFromFullImage(imagePath);
+
+        this.logger.debug(
+          `✅ ${playerNames.length} nom(s) de joueur(s) extraits`
+        );
+        return playerNames;
+      } else {
+        // Si pas de debug, sauvegarder temporairement pour OCR (car on doit passer un chemin de fichier)
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `temp_players_names_${timestamp}`;
+        await this.screenCapture.saveCapture(playersScreenshot, filename);
+
+        const path = await import('path');
+        imagePath = path.join(process.cwd(), 'captures', `${filename}.png`);
+
+        // Extraire les noms via OCR
+        const playerNames =
+          await this.extractPlayerNamesFromFullImage(imagePath);
+
+        // Supprimer le fichier temporaire
+        try {
+          const fs = await import('fs');
+          await fs.promises.unlink(imagePath);
+        } catch (error) {
+          // Ignorer les erreurs de suppression
+        }
+
+        this.logger.debug(
+          `✅ ${playerNames.length} nom(s) de joueur(s) extraits`
+        );
+        return playerNames;
+      }
+    } catch (error) {
+      this.logger.error(
+        "❌ Erreur lors de l'extraction des noms de joueurs:",
+        error
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Extrait les noms des joueurs depuis une image complète via OCR
+   */
+  private async extractPlayerNamesFromFullImage(
+    imagePath: string
+  ): Promise<string[]> {
+    try {
+      // Configuration OCR optimisée pour plusieurs mots alignés horizontalement
+      const ocrConfig = {
+        lang: 'eng+fra',
+        options: {
+          tessedit_char_whitelist:
+            'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ0123456789_- ',
+          tessedit_pageseg_mode: 6, // Uniform block of text
+          preserve_interword_spaces: 1,
+        },
+      };
+
+      this.logger.debug("🧠 Lancement de l'OCR pour extraction des noms...");
+
+      const { createWorker, PSM } = await import('tesseract.js');
+      const worker = await createWorker(ocrConfig.lang);
+
+      await worker.setParameters({
+        tessedit_char_whitelist: ocrConfig.options.tessedit_char_whitelist,
+        tessedit_pageseg_mode: PSM.SINGLE_LINE,
+        preserve_interword_spaces: '1',
+      });
+
+      // Utiliser le chemin de fichier avec Tesseract (évite les erreurs "truncated file")
+      const { data } = await worker.recognize(imagePath);
+      await worker.terminate();
+
+      this.logger.debug(`📝 Texte OCR brut: "${data.text}"`);
+
+      // Parser le texte pour extraire les noms individuels
+      const playerNames = this.parsePlayerNamesFromOCRText(data.text);
+
+      return playerNames;
+    } catch (error) {
+      this.logger.error('❌ Erreur OCR extraction noms joueurs:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Parse le texte OCR pour extraire les noms individuels des joueurs
+   */
+  private parsePlayerNamesFromOCRText(ocrText: string): string[] {
+    try {
+      const playerNames: string[] = [];
+
+      // Diviser le texte en mots/tokens potentiels
+      const tokens = ocrText
+        .split(/\s+/) // Diviser par espaces
+        .map((token) => token.trim())
+        .filter((token) => token.length > 0);
+
+      // Filtrer et nettoyer les noms valides
+      for (const token of tokens) {
+        const cleanedName = token
+          .replace(/[^\w\-\u00C0-\u017F]/g, '') // Garder seulement lettres, chiffres, tirets et accents
+          .trim();
+
+        // Vérifier que c'est un nom valide (au moins 2 caractères, pas que des chiffres)
+        if (cleanedName.length >= 2 && !/^\d+$/.test(cleanedName)) {
+          playerNames.push(cleanedName);
+        }
+      }
+
+      // Limiter au nombre maximum de joueurs par page pour éviter les faux positifs
+      const maxPlayers = this.config.ui.pagination.playersPerPage;
+      const finalNames = playerNames.slice(0, maxPlayers);
+
+      this.logger.debug(`🎯 Noms extraits: [${finalNames.join(', ')}]`);
+      return finalNames;
+    } catch (error) {
+      this.logger.error('❌ Erreur parsing noms de joueurs:', error);
+      return [];
+    }
+  }
+
+  /**
    * Extrait le nom du joueur à une position spécifique via OCR
    */
   private async extractPlayerNameAtPosition(
@@ -428,7 +616,7 @@ export class GameNavigationService {
       // Calculer la zone OCR pour ce joueur (alignement horizontal)
       const nameRegion = this.config.players.nameExtractionRegion;
       const ocrRegion = {
-        x: nameRegion.x + (playerIndex * nameRegion.horizontalSpacing),
+        x: nameRegion.x + playerIndex * nameRegion.horizontalSpacing,
         y: nameRegion.y, // Y fixe pour alignement horizontal
         width: nameRegion.width,
         height: nameRegion.height,
@@ -439,15 +627,20 @@ export class GameNavigationService {
         region: ocrRegion,
       });
 
+      let imagePath: string | null = null;
       // Sauvegarder pour debug si activé
       if (this.config.debug.saveCaptures) {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const filename = `player_name_${playerIndex + 1}_${timestamp}`;
         await this.screenCapture.saveCapture(nameScreenshot, filename);
+        const path = await import('path');
+        imagePath = path.join(process.cwd(), 'captures', `${filename}.png`);
       }
 
       // OCR pour extraire le nom
-      const playerName = await this.extractPlayerNameFromImage(nameScreenshot);
+      const playerName = await this.extractPlayerNameFromImage(
+        imagePath || nameScreenshot
+      );
 
       if (!playerName || playerName.trim().length === 0) {
         this.logger.debug(
