@@ -964,15 +964,51 @@ export class GameNavigationService {
       ownerName
     );
 
-    // Pour chaque place, extraire les récompenses par hover
-    for (const place of monumentData.places) {
+    // Extraire les récompenses pour les 5 places fixes
+    const totalPlaces = 5;
+    for (let placeIndex = 1; placeIndex <= totalPlaces; placeIndex++) {
       try {
-        place.rewards = await this.extractRewardsForPlace(place.position);
+        const rewards = await this.extractRewardsForPlace(placeIndex);
+
+        // Trouver la place correspondante dans monumentData ou la créer si nécessaire
+        let place = monumentData.places.find(
+          (place) => place.position === placeIndex
+        );
+        if (!place) {
+          // Créer une place par défaut si elle n'existe pas
+          place = {
+            position: placeIndex,
+            cost: 0,
+            return: 0,
+            isAvailable: true,
+            currentInvestment: 0,
+            rewards: [],
+          };
+          monumentData.places.push(place);
+        }
+
+        place.rewards = rewards;
       } catch (error) {
         this.logger.error(
-          `❌ Erreur extraction récompenses place ${place.position}:`,
+          `❌ Erreur extraction récompenses place ${placeIndex}:`,
           error
         );
+
+        // Assurer qu'une place existe même en cas d'erreur
+        let place = monumentData.places.find(
+          (place) => place.position === placeIndex
+        );
+        if (!place) {
+          place = {
+            position: placeIndex,
+            cost: 0,
+            return: 0,
+            isAvailable: true,
+            currentInvestment: 0,
+            rewards: [],
+          };
+          monumentData.places.push(place);
+        }
         place.rewards = []; // Valeur par défaut si l'extraction échoue
       }
     }
@@ -1007,18 +1043,31 @@ export class GameNavigationService {
       // 2. Hover sur l'icône
       await this.automationService.moveMouseToPosition(
         rewardIconCoords.x,
-        rewardIconCoords.y
+        rewardIconCoords.y,
+        this.config.monument.rewardIcons.width,
+        this.config.monument.rewardIcons.height
       );
       await this.automationService.randomDelay(500, 1000);
 
       // 3. Capturer tooltip (position dynamique basée sur la souris)
-      const tooltipScreenshot = await this.captureTooltipAtMousePosition();
+      const tooltipImagePath = await this.captureTooltipAtMousePosition();
 
       // 4. OCR de la tooltip
-      const rewards = await this.parseRewardsFromTooltip(tooltipScreenshot);
+      const rewards = await this.parseRewardsFromTooltip(tooltipImagePath);
 
       // 5. Déplacer la souris ailleurs pour fermer la tooltip
       await this.automationService.moveMouseAway();
+
+      // 6. Supprimer le fichier temporaire si debug désactivé
+      if (!this.config.debug.saveCaptures) {
+        try {
+          const fs = await import('fs');
+          await fs.promises.unlink(tooltipImagePath);
+          this.logger.debug('🗑️ Fichier tooltip temporaire supprimé');
+        } catch (error) {
+          // Ignorer les erreurs de suppression
+        }
+      }
 
       this.logger.debug(
         `✅ ${rewards.length} récompense(s) extraite(s) pour place ${placePosition}`
@@ -1053,14 +1102,14 @@ export class GameNavigationService {
   /**
    * Capture la tooltip à la position actuelle de la souris
    */
-  private async captureTooltipAtMousePosition(): Promise<any> {
+  private async captureTooltipAtMousePosition(): Promise<string> {
     try {
       // La tooltip apparaît près de la position actuelle de la souris
       const mousePos = await this.automationService.getMousePosition();
 
       const tooltipRegion = {
-        x: mousePos.x + 10, // Décalage standard des tooltips
-        y: mousePos.y - 50,
+        x: mousePos.x + 13, // Décalage standard des tooltips
+        y: mousePos.y - 106,
         width: this.config.monument.tooltipRegion.width,
         height: this.config.monument.tooltipRegion.height,
       };
@@ -1068,7 +1117,21 @@ export class GameNavigationService {
       // Attendre que la tooltip apparaisse
       await this.automationService.randomDelay(300, 500);
 
-      return await this.screenCapture.captureScreen({ region: tooltipRegion });
+      const tooltipScreenshot = await this.screenCapture.captureScreen({
+        region: tooltipRegion,
+      });
+
+      // Sauvegarder l'image pour l'OCR (obligatoire car on doit passer le chemin)
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `tooltip_${timestamp}`;
+      await this.screenCapture.saveCapture(tooltipScreenshot, filename);
+
+      // Construire le chemin complet du fichier sauvegardé
+      const path = await import('path');
+      const imagePath = path.join(process.cwd(), 'captures', `${filename}.png`);
+
+      this.logger.debug(`📁 Tooltip sauvegardée pour OCR: ${imagePath}`);
+      return imagePath;
     } catch (error) {
       this.logger.error('❌ Erreur capture tooltip:', error);
       throw error;
@@ -1079,11 +1142,11 @@ export class GameNavigationService {
    * Parse les récompenses depuis une tooltip via OCR
    */
   private async parseRewardsFromTooltip(
-    tooltipImage: any
+    tooltipImagePath: string
   ): Promise<RewardItem[]> {
     try {
       const ocrText =
-        await this.ocrService.extractTextFromTooltip(tooltipImage);
+        await this.ocrService.extractTextFromTooltip(tooltipImagePath);
       const rewards: RewardItem[] = [];
 
       // Pattern: "+100 Points Forge"

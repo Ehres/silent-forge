@@ -116,6 +116,8 @@ export interface Config {
     rewardIcons: {
       baseX: number; // Position X de base (alignement vertical)
       baseY: number; // Position Y de la première icône
+      width: number; // Largeur de chaque icône
+      height: number; // Hauteur de chaque icône
       verticalSpacing: number; // Espacement vertical entre les icônes
     };
     tooltipRegion: {
@@ -245,15 +247,17 @@ export const defaultConfig: Config = {
   },
   monument: {
     rewardIcons: {
-      baseX: 600, // Position X fixe (alignement vertical) - À calibrer
-      baseY: 300, // Position Y de la première icône - À calibrer
-      verticalSpacing: 60, // Espacement vertical entre les places
+      baseX: 1192, // Position X fixe (alignement vertical)
+      baseY: 576, // Position Y de la première icône
+      width: 17, // Largeur de chaque icône
+      height: 17, // Hauteur de chaque icône
+      verticalSpacing: 60, // Espacement vertical entre les icônes
     },
     tooltipRegion: {
       x: 400,
       y: 200,
-      width: 250,
-      height: 120,
+      width: 320,
+      height: 87,
     },
     investmentsRegion: {
       x: 200,

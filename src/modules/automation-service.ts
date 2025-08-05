@@ -174,10 +174,32 @@ export class AutomationService {
 
   /**
    * Déplacement de souris vers une position avec mouvement humain
+   * Si width et height sont fournis, clique aléatoirement dans la zone définie
    */
-  async moveMouseToPosition(x: number, y: number): Promise<void> {
+  async moveMouseToPosition(
+    x: number,
+    y: number,
+    width?: number,
+    height?: number
+  ): Promise<void> {
     try {
-      await this.moveMouseHumanlike(x, y);
+      let targetX = x;
+      let targetY = y;
+
+      // Si une zone est définie, générer une position aléatoire dans cette zone
+      if (width !== undefined && height !== undefined) {
+        const randomOffsetX = Math.floor(Math.random() * width);
+        const randomOffsetY = Math.floor(Math.random() * height);
+
+        targetX = x + randomOffsetX;
+        targetY = y + randomOffsetY;
+
+        this.logger.debug(
+          `🎯 Clic aléatoire dans zone (${x}, ${y}) ${width}x${height} → (${targetX}, ${targetY})`
+        );
+      }
+
+      await this.moveMouseHumanlike(targetX, targetY);
     } catch (error) {
       this.logger.error('Erreur lors du déplacement de souris:', error);
       throw error;
@@ -194,6 +216,26 @@ export class AutomationService {
       await this.randomDelay(200, 400);
     } catch (error) {
       this.logger.error('Erreur lors du déplacement de souris (away):', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Déplace la souris vers une zone définie et clique aléatoirement dedans
+   */
+  async moveMouseToZone(zone: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }): Promise<void> {
+    try {
+      await this.moveMouseToPosition(zone.x, zone.y, zone.width, zone.height);
+    } catch (error) {
+      this.logger.error(
+        'Erreur lors du déplacement de souris vers zone:',
+        error
+      );
       throw error;
     }
   }
