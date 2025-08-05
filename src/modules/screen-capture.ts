@@ -50,7 +50,7 @@ export class ScreenCapture {
       region: {
         x: 477,
         y: 568,
-        width: 780,
+        width: 670,
         height: 195,
       },
     };

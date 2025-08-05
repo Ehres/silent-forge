@@ -947,16 +947,20 @@ export class GameNavigationService {
     // Capturer la zone des places du monument
     const screenshot = await this.screenCapture.captureMonument();
 
-    // Sauvegarder pour debug si activé
-    if (this.config.debug.saveCaptures) {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filename = `monument_${timestamp}`;
-      await this.screenCapture.saveCapture(screenshot, filename);
-    }
+    // Sauvegarder l'image pour l'OCR (obligatoire car on doit passer le chemin)
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `monument_${timestamp}`;
+    await this.screenCapture.saveCapture(screenshot, filename);
 
-    // Analyser avec OCR en passant le nom du propriétaire
+    // Construire le chemin complet du fichier sauvegardé
+    const path = await import('path');
+    const imagePath = path.join(process.cwd(), 'captures', `${filename}.png`);
+
+    this.logger.debug(`📁 Image sauvegardée pour OCR: ${imagePath}`);
+
+    // Analyser avec OCR en passant le chemin de l'image et le nom du propriétaire
     const monumentData = await this.ocrService.analyzeMonument(
-      screenshot,
+      imagePath,
       ownerName
     );
 
@@ -970,6 +974,17 @@ export class GameNavigationService {
           error
         );
         place.rewards = []; // Valeur par défaut si l'extraction échoue
+      }
+    }
+
+    // Supprimer le fichier temporaire si debug désactivé
+    if (!this.config.debug.saveCaptures) {
+      try {
+        const fs = await import('fs');
+        await fs.promises.unlink(imagePath);
+        this.logger.debug('🗑️ Fichier temporaire supprimé');
+      } catch (error) {
+        // Ignorer les erreurs de suppression
       }
     }
 
@@ -1232,107 +1247,6 @@ export class GameNavigationService {
     });
 
     return targetMonuments;
-  }
-
-  /**
-   * Parse une ligne du tableau des monuments via OCR
-   * Format attendu : | Nom | Niveau | Progression | Points de forge | Rang | Activité |
-   */
-  private parseMonumentTableRow(
-    ocrText: string,
-    rowIndex: number
-  ): MonumentTableRow | null {
-    try {
-      this.logger.debug(`🔍 Parsing ligne ${rowIndex}: "${ocrText}"`);
-
-      // Nettoyer le texte OCR
-      const cleanedText = ocrText.replace(/[|]/g, ' ').trim();
-
-      // Patterns regex pour extraire les différentes colonnes
-
-      // 1. Progression au format "X/Y" ou "X / Y" (avec espaces optionnels)
-      const progressionPattern = /(\d+)\s*\/\s*(\d+)/;
-      const progressionMatch = cleanedText.match(progressionPattern);
-
-      if (!progressionMatch) {
-        this.logger.debug(
-          `⚠️ Ligne ${rowIndex} non parsée: pas de progression trouvée`
-        );
-        return null;
-      }
-
-      const progressionCurrent = parseInt(progressionMatch[1]);
-      const progressionMaximum = parseInt(progressionMatch[2]);
-
-      // 2. Extraire le nom du monument (tout ce qui précède le premier nombre)
-      const beforeFirstNumberPattern = /^([A-Za-zÀ-ÿ\s\-']+?)(?=\s+\d)/;
-      const nameMatch = cleanedText.match(beforeFirstNumberPattern);
-
-      if (!nameMatch) {
-        this.logger.debug(`⚠️ Ligne ${rowIndex} non parsée: nom non trouvé`);
-        return null;
-      }
-
-      const monumentName = nameMatch[1].trim();
-
-      // 3. Extraire le niveau (premier nombre après le nom)
-      const afterNamePattern = new RegExp(
-        `${monumentName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+(\\d{1,2})`
-      );
-      const levelMatch = cleanedText.match(afterNamePattern);
-      const level = levelMatch ? parseInt(levelMatch[1]) : 1;
-
-      // 4. Investissement personnel avec rang - pattern plus robuste
-      // Chercher: nombre + "PF" + quelque chose + "rang" + nombre
-      const investmentPattern = /(\d+)\s*PF.*?rang\s*(\d+)/i;
-      const investmentMatch = cleanedText.match(investmentPattern);
-
-      let myInvestment: number | null = null;
-      let myRank: number | null = null;
-
-      if (investmentMatch) {
-        // Vérifier que ce n'est pas le nombre de la progression
-        const potentialInvestment = parseInt(investmentMatch[1]);
-        if (
-          potentialInvestment !== progressionCurrent &&
-          potentialInvestment !== progressionMaximum
-        ) {
-          myInvestment = potentialInvestment;
-          myRank = parseInt(investmentMatch[2]);
-        }
-      }
-
-      // Calculer la position du bouton "Activité" basée sur la position de la ligne
-      const baseY = 451; // Y de base (à calibrer selon l'interface)
-      const rowSpacing = 8; // Espacement entre les lignes
-      const activityButtonPosition = {
-        x: 1060, // Position X fixe du bouton (à calibrer)
-        y: baseY + rowIndex * rowSpacing,
-        height: 22,
-        width: 130,
-      };
-
-      const result: MonumentTableRow = {
-        name: monumentName,
-        level,
-        progression: {
-          current: progressionCurrent,
-          maximum: progressionMaximum,
-        },
-        myInvestment,
-        myRank,
-        activityButtonPosition,
-      };
-
-      this.logger.debug(
-        `✅ Ligne ${rowIndex} parsée: ${monumentName} (Niv.${level}) - ${progressionCurrent}/${progressionMaximum} PF`
-      );
-
-      return result;
-    } catch (error) {
-      this.logger.error(`❌ Erreur parsing ligne ${rowIndex}:`, error);
-      return null;
-    }
   }
 
   /**

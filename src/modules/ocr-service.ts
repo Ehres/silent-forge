@@ -31,9 +31,10 @@ export class OCRService {
 
   /**
    * Analyse une capture d'écran de Grand Monument pour extraire les données
+   * Accepte soit un objet Image soit un chemin de fichier
    */
   async analyzeMonument(
-    image: Image,
+    imagePathOrImage: string | Image,
     ownerName?: string,
     config?: OCRConfig
   ): Promise<MonumentData> {
@@ -42,8 +43,38 @@ export class OCRService {
 
       const ocrConfig = { ...this.defaultConfig, ...config };
 
-      // Simuler l'extraction des investissements
-      const investmentData = await this.extractInvestmentData(image, ownerName);
+      // Si c'est un chemin de fichier, faire l'OCR directement sur le fichier
+      if (typeof imagePathOrImage === 'string') {
+        this.logger.debug(
+          `📁 Analyse OCR depuis le fichier: ${imagePathOrImage}`
+        );
+
+        // Parser le tableau de monument avec OCR
+        const investmentData = await this.parseMonumentTableFromFile(
+          imagePathOrImage,
+          ownerName
+        );
+
+        // Retourner directement les données avec l'investissement analysé
+        const monumentData: MonumentData = {
+          name: 'Monument analysé par OCR',
+          places: [], // Places seront extraites séparément si nécessaire
+          timestamp: new Date(),
+          hasExistingInvestments: investmentData.playerInvestments.length > 0,
+          investmentData: investmentData,
+        };
+
+        this.logger.success(
+          `✅ Monument analysé: ${investmentData.ownerName} (${investmentData.ownerForgePoints} PF) + ${investmentData.playerInvestments.length} investisseurs`
+        );
+        return monumentData;
+      }
+
+      // Utiliser la méthode existante (ou simulée si c'était un fichier)
+      const investmentData = await this.extractInvestmentData(
+        typeof imagePathOrImage === 'string' ? (null as any) : imagePathOrImage,
+        ownerName
+      );
 
       // Données de test simulées avec support des récompenses
       const places: MonumentPlace[] = [
@@ -817,5 +848,211 @@ export class OCRService {
         activityButtonPosition: { x: 1150, y: 620, width: 130, height: 22 },
       },
     ];
+  }
+
+  /**
+   * Parse un tableau de monument à 3 colonnes depuis un fichier avec Tesseract
+   * Structure: [Numéro place | Avatar + Nom joueur | Points de forge]
+   * Note: Le propriétaire a la première colonne vide
+   */
+  private async parseMonumentTableFromFile(
+    imagePath: string,
+    ownerName?: string
+  ): Promise<MonumentInvestmentData> {
+    try {
+      this.logger.debug(
+        '🧠 Analyse OCR du tableau de monument à partir du fichier...'
+      );
+
+      // Extraction du texte avec Tesseract
+      const result = await Tesseract.recognize(imagePath, 'fra+eng', {
+        logger: (message) => {
+          if (message.status === 'recognizing text') {
+            this.logger.debug(
+              `OCR progress: ${Math.round(message.progress * 100)}%`
+            );
+          }
+        },
+      });
+
+      const extractedText = result.data.text;
+      this.logger.debug(
+        `📝 Texte extrait: ${extractedText.substring(0, 200)}...`
+      );
+
+      return this.parseMonumentTable(extractedText, ownerName);
+    } catch (error) {
+      this.logger.error("❌ Erreur lors de l'analyse OCR du monument:", error);
+      // Retourner des données par défaut
+      return {
+        ownerName: ownerName || 'Inconnu',
+        ownerForgePoints: 0,
+        playerInvestments: [],
+      };
+    }
+  }
+
+  /**
+   * Parse le texte OCR extrait pour identifier le tableau de monument
+   * Structure des colonnes: [Place, Nom joueur, Points de forge]
+   * Le propriétaire a la première colonne vide
+   */
+  private parseMonumentTable(
+    text: string,
+    ownerName?: string
+  ): MonumentInvestmentData {
+    const lines = text.split('\n').filter((line) => line.trim().length > 0);
+    this.logger.debug(`🔍 Analyse de ${lines.length} lignes du tableau`);
+
+    const playerInvestments: Array<{
+      playerName: string;
+      forgePoints: number;
+      rank: number;
+    }> = [];
+    let detectedOwnerName = ownerName || 'Inconnu';
+    let ownerForgePoints = 0;
+    let currentRank = 1;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      this.logger.debug(`📋 Ligne ${i + 1}: "${line}"`);
+
+      // Ignorer les lignes "Aucun participant"
+      if (line.includes('Aucun participant')) {
+        continue;
+      }
+
+      // Diviser la ligne en utilisant différents séparateurs
+      let columns: string[] = [];
+
+      // Essayer plusieurs méthodes de division
+      if (line.includes('\t')) {
+        columns = line.split('\t').filter((col) => col.trim().length > 0);
+      } else {
+        // Diviser par espaces multiples, mais garder les noms composés
+        columns = line.split(/\s{2,}/).filter((col) => col.trim().length > 0);
+
+        // Si on n'a que 2 colonnes, essayer une division différente
+        if (columns.length === 1) {
+          // Cas comme "I >. Sibel 16013" ou "1 fn Agrou 1600 @"
+          const parts = line.split(/\s+/);
+          if (parts.length >= 3) {
+            // Regrouper les parties du nom (toutes sauf la première et la dernière)
+            const firstPart = parts[0];
+            const lastPart = parts[parts.length - 1];
+            const nameParts = parts.slice(1, -1);
+
+            // Vérifier si le dernier élément est un nombre (points de forge)
+            if (lastPart.match(/\d+/)) {
+              columns = [firstPart, nameParts.join(' '), lastPart];
+            } else {
+              // Cas où les points sont dans l'avant-dernière position
+              if (parts.length >= 4 && parts[parts.length - 2].match(/\d+/)) {
+                columns = [
+                  firstPart,
+                  nameParts.slice(0, -1).join(' '),
+                  parts[parts.length - 2],
+                ];
+              }
+            }
+          }
+        }
+      }
+
+      this.logger.debug(
+        `🔧 Colonnes extraites: [${columns.map((c) => `"${c}"`).join(', ')}]`
+      );
+
+      if (columns.length >= 2) {
+        const firstColumn = columns[0].trim();
+
+        // Vérifier si c'est le propriétaire (pas de numéro de place, ou marqueur spécial)
+        const isOwner =
+          !firstColumn.match(/^\d+$/) || firstColumn.includes('>');
+
+        if (isOwner) {
+          // Propriétaire détecté
+          if (columns.length >= 2) {
+            let nameColumn = '';
+            let pointsColumn = '';
+
+            if (columns.length === 2) {
+              // Format: ["I >. Sibel", "16013"]
+              nameColumn = columns[0].replace(/[I>\.\s]+/, '').trim(); // Enlever les artefacts
+              pointsColumn = columns[1];
+            } else if (columns.length >= 3) {
+              // Format: ["I", "Sibel", "16013"]
+              nameColumn = columns[1];
+              pointsColumn = columns[2];
+            }
+
+            if (nameColumn && pointsColumn) {
+              detectedOwnerName = this.cleanPlayerName(nameColumn);
+              ownerForgePoints = this.parseForgePoints(pointsColumn);
+              this.logger.debug(
+                `👑 Propriétaire détecté: ${detectedOwnerName} (${ownerForgePoints} PF)`
+              );
+            }
+          }
+        } else if (firstColumn.match(/^\d+$/)) {
+          // Investisseur avec numéro de place
+          if (columns.length >= 3) {
+            const playerName = this.cleanPlayerName(columns[1]);
+            const forgePoints = this.parseForgePoints(columns[2]);
+
+            if (playerName && forgePoints > 0) {
+              playerInvestments.push({
+                playerName,
+                forgePoints,
+                rank: currentRank++,
+              });
+              this.logger.debug(
+                `💰 Investisseur: ${playerName} (${forgePoints} PF, rang ${currentRank - 1})`
+              );
+            }
+          }
+        }
+      }
+    }
+
+    // Trier les investisseurs par points de forge décroissants
+    playerInvestments.sort((a, b) => b.forgePoints - a.forgePoints);
+
+    // Recalculer les rangs après tri
+    playerInvestments.forEach((investment, index) => {
+      investment.rank = index + 1;
+    });
+
+    this.logger.success(
+      `✅ Analyse terminée: Propriétaire ${detectedOwnerName} (${ownerForgePoints} PF), ${playerInvestments.length} investisseurs`
+    );
+
+    return {
+      ownerName: detectedOwnerName,
+      ownerForgePoints,
+      playerInvestments,
+    };
+  }
+
+  /**
+   * Nettoie le nom du joueur en supprimant les artefacts OCR
+   */
+  private cleanPlayerName(rawName: string): string {
+    // Nettoyer le nom du joueur en supprimant les artefacts OCR
+    return rawName
+      .replace(/[I>\.\@\©\®]+/g, '') // Supprimer les artefacts spécifiques (I, >, ., @, ©, ®)
+      .replace(/^(fn|El)\s*/g, '') // Supprimer les préfixes détectés par OCR
+      .replace(/[^\w\s\-\.\'\`]+/g, '') // Garder seulement les caractères alphanumériques, espaces, tirets, points, apostrophes
+      .replace(/\s+/g, ' ') // Normaliser les espaces multiples
+      .trim();
+  }
+
+  /**
+   * Extrait les points de forge du texte OCR
+   */
+  private parseForgePoints(rawPoints: string): number {
+    // Extraire les points de forge du texte
+    const match = rawPoints.match(/(\d+)/);
+    return match ? parseInt(match[1], 10) : 0;
   }
 }
