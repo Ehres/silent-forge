@@ -964,53 +964,48 @@ export class GameNavigationService {
       ownerName
     );
 
-    // Extraire les récompenses pour les 5 places fixes
-    const totalPlaces = 5;
-    for (let placeIndex = 1; placeIndex <= totalPlaces; placeIndex++) {
+    // Extraire les récompenses pour toutes les places de manière strictement séquentielle
+    this.logger.debug(
+      `🎁 Extraction séquentielle des récompenses pour ${monumentData.places.length} places...`
+    );
+
+    let currentIndex = 0;
+    for (const place of monumentData.places) {
       try {
-        const rewards = await this.extractRewardsForPlace(placeIndex);
-
-        // Trouver la place correspondante dans monumentData ou la créer si nécessaire
-        let place = monumentData.places.find(
-          (place) => place.position === placeIndex
+        this.logger.debug(
+          `🎁 [${currentIndex + 1}/${monumentData.places.length}] Extraction récompenses place ${place.position}...`
         );
-        if (!place) {
-          // Créer une place par défaut si elle n'existe pas
-          place = {
-            position: placeIndex,
-            cost: 0,
-            return: 0,
-            isAvailable: true,
-            currentInvestment: 0,
-            rewards: [],
-          };
-          monumentData.places.push(place);
-        }
 
+        // Attendre que l'extraction précédente soit complètement terminée
+        const rewards = await this.extractRewardsForPlace(place.position);
         place.rewards = rewards;
+
+        this.logger.debug(
+          `✅ [${currentIndex + 1}/${monumentData.places.length}] ${rewards.length} récompense(s) extraite(s) pour place ${place.position}`
+        );
+
+        // Délai obligatoire entre chaque extraction pour garantir la séquentialité
+        if (currentIndex < monumentData.places.length - 1) {
+          this.logger.debug('⏱️ Attente avant prochaine extraction...');
+          await this.automationService.randomDelay(200, 1000);
+        }
       } catch (error) {
         this.logger.error(
-          `❌ Erreur extraction récompenses place ${placeIndex}:`,
+          `❌ [${currentIndex + 1}/${monumentData.places.length}] Erreur extraction récompenses place ${place.position}:`,
           error
         );
-
-        // Assurer qu'une place existe même en cas d'erreur
-        let place = monumentData.places.find(
-          (place) => place.position === placeIndex
-        );
-        if (!place) {
-          place = {
-            position: placeIndex,
-            cost: 0,
-            return: 0,
-            isAvailable: true,
-            currentInvestment: 0,
-            rewards: [],
-          };
-          monumentData.places.push(place);
-        }
         place.rewards = []; // Valeur par défaut si l'extraction échoue
+
+        // Même en cas d'erreur, attendre avant de continuer pour maintenir la séquentialité
+        if (currentIndex < monumentData.places.length - 1) {
+          this.logger.debug(
+            '⏱️ Attente après erreur avant prochaine extraction...'
+          );
+          await this.automationService.randomDelay(800, 1500);
+        }
       }
+
+      currentIndex++;
     }
 
     // Supprimer le fichier temporaire si debug désactivé
@@ -1047,7 +1042,7 @@ export class GameNavigationService {
         this.config.monument.rewardIcons.width,
         this.config.monument.rewardIcons.height
       );
-      await this.automationService.randomDelay(500, 1000);
+      await this.automationService.randomDelay(100, 500);
 
       // 3. Capturer tooltip (position dynamique basée sur la souris)
       const tooltipImagePath = await this.captureTooltipAtMousePosition();
@@ -1055,10 +1050,7 @@ export class GameNavigationService {
       // 4. OCR de la tooltip
       const rewards = await this.parseRewardsFromTooltip(tooltipImagePath);
 
-      // 5. Déplacer la souris ailleurs pour fermer la tooltip
-      await this.automationService.moveMouseAway();
-
-      // 6. Supprimer le fichier temporaire si debug désactivé
+      // 5. Supprimer le fichier temporaire si debug désactivé
       if (!this.config.debug.saveCaptures) {
         try {
           const fs = await import('fs');

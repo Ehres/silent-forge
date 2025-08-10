@@ -251,7 +251,7 @@ export const defaultConfig: Config = {
       baseY: 576, // Position Y de la première icône
       width: 17, // Largeur de chaque icône
       height: 17, // Hauteur de chaque icône
-      verticalSpacing: 60, // Espacement vertical entre les icônes
+      verticalSpacing: 35, // Espacement vertical entre les icônes
     },
     tooltipRegion: {
       x: 400,

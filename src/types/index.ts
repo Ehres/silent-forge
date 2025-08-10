@@ -141,6 +141,36 @@ export interface OCRTableRowResult {
 }
 
 /**
+ * Position et dimensions d'un bouton dans l'interface
+ */
+export interface ButtonPosition {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Progression d'un monument
+ */
+export interface MonumentProgression {
+  current: number;
+  maximum: number;
+}
+
+/**
+ * Données parsées d'une ligne du tableau des monuments
+ */
+export interface ParsedMonumentTableRow {
+  name: string;
+  level: number;
+  progression: MonumentProgression;
+  myInvestment: number | null;
+  myRank: number | null;
+  activityButtonPosition: ButtonPosition;
+}
+
+/**
  * Configuration des zones d'interface utilisateur
  */
 export interface UIRegions {

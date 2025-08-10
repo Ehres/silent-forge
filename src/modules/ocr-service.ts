@@ -6,6 +6,7 @@ import {
   OCRConfig,
   MonumentInvestmentData,
   PlayerInvestment,
+  ParsedMonumentTableRow,
 } from '../types';
 import { Logger } from '../utils/logger';
 
@@ -55,10 +56,13 @@ export class OCRService {
           ownerName
         );
 
+        // Générer les places à partir des données d'investissement
+        const places = this.generatePlacesFromInvestmentData(investmentData);
+
         // Retourner directement les données avec l'investissement analysé
         const monumentData: MonumentData = {
           name: 'Monument analysé par OCR',
-          places: [], // Places seront extraites séparément si nécessaire
+          places: places, // Places générées à partir des investisseurs
           timestamp: new Date(),
           hasExistingInvestments: investmentData.playerInvestments.length > 0,
           investmentData: investmentData,
@@ -143,6 +147,59 @@ export class OCRService {
       this.logger.error("Erreur lors de l'analyse OCR:", error);
       throw error;
     }
+  }
+
+  /**
+   * Génère les places du monument à partir des données d'investissement
+   * Crée 5 places (positions 1-5) en utilisant les investisseurs détectés
+   */
+  private generatePlacesFromInvestmentData(
+    investmentData: MonumentInvestmentData
+  ): MonumentPlace[] {
+    const places: MonumentPlace[] = [];
+
+    // Créer les 5 places standard
+    for (let position = 1; position <= 5; position++) {
+      // Chercher si un investisseur occupe cette position
+      const investor = investmentData.playerInvestments.find(
+        (inv) => inv.rank === position
+      );
+
+      if (investor) {
+        // Place occupée par un investisseur
+        places.push({
+          position,
+          cost: investor.forgePoints, // Montant déjà investi
+          return: Math.floor(investor.forgePoints * 1.1), // Estimation du retour (+10%)
+          playerName: investor.playerName,
+          isAvailable: false, // Place occupée
+          currentInvestment: investor.forgePoints,
+          rewards: [], // Sera rempli par l'extraction des récompenses
+        });
+
+        this.logger.debug(
+          `📍 Place ${position}: ${investor.playerName} (${investor.forgePoints} PF)`
+        );
+      } else {
+        // Place libre
+        places.push({
+          position,
+          cost: 0, // Pas de coût initial pour une place libre
+          return: 0, // Pas de retour défini pour une place libre
+          isAvailable: true, // Place disponible
+          currentInvestment: 0,
+          rewards: [], // Sera rempli par l'extraction des récompenses
+        });
+
+        this.logger.debug(`📍 Place ${position}: Libre`);
+      }
+    }
+
+    this.logger.debug(
+      `✅ ${places.length} places générées (${places.filter((p) => !p.isAvailable).length} occupées, ${places.filter((p) => p.isAvailable).length} libres)`
+    );
+
+    return places;
   }
 
   /**
@@ -558,7 +615,9 @@ export class OCRService {
    * Extrait les données d'un tableau de monuments via OCR
    * Avec préparation d'image et parsing optimisé
    */
-  async extractMonumentTableData(screenshot: any): Promise<any[]> {
+  async extractMonumentTableData(
+    screenshot: any
+  ): Promise<ParsedMonumentTableRow[]> {
     this.logger.debug('📊 Extraction des données du tableau des monuments...');
 
     try {
@@ -667,11 +726,13 @@ export class OCRService {
   /**
    * Parse le texte OCR brut en lignes de tableau structurées
    */
-  private async parseOCRTextToTableRows(ocrData: any): Promise<any[]> {
+  private async parseOCRTextToTableRows(
+    ocrData: any
+  ): Promise<ParsedMonumentTableRow[]> {
     this.logger.debug('📝 Parsing du texte OCR en lignes de tableau...');
 
     try {
-      const rows: any[] = [];
+      const rows: ParsedMonumentTableRow[] = [];
       const lines = ocrData.text
         .split('\n')
         .filter((line: string) => line.trim().length > 0);
@@ -720,7 +781,10 @@ export class OCRService {
    * Parse une ligne du tableau des monuments via OCR
    * Format attendu : | Nom | Niveau | Progression | Points de forge | Rang | Activité |
    */
-  private parseMonumentTableRow(ocrText: string, rowIndex: number): any | null {
+  private parseMonumentTableRow(
+    ocrText: string,
+    rowIndex: number
+  ): ParsedMonumentTableRow | null {
     try {
       this.logger.debug(`🔍 Parsing ligne ${rowIndex}: "${ocrText}"`);
 
@@ -778,16 +842,17 @@ export class OCRService {
       }
 
       // Calculer la position du bouton "Activité"
-      const baseY = 451; // Y de base (à calibrer selon l'interface)
+      const baseY = 451; // Y de base
       const rowSpacing = 8; // Espacement entre les lignes
+      const height = 22;
       const activityButtonPosition = {
-        x: 1060, // Position X fixe du bouton (à calibrer)
-        y: baseY + rowIndex * rowSpacing,
-        height: 22,
+        x: 1060, // Position X fixe du bouton
+        y: baseY + rowIndex * rowSpacing + rowIndex * height,
+        height,
         width: 130,
       };
 
-      const result = {
+      const result: ParsedMonumentTableRow = {
         name: monumentName,
         level,
         progression: {
@@ -813,7 +878,7 @@ export class OCRService {
   /**
    * Données simulées pour fallback
    */
-  private getSimulatedMonumentData(): any[] {
+  private getSimulatedMonumentData(): ParsedMonumentTableRow[] {
     return [
       {
         name: 'Arc de Triomphe',
