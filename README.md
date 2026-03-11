@@ -19,26 +19,35 @@ Silent Forge automatise un processus en 7 étapes pour analyser et investir dans
 ### Installation
 
 ```bash
-npm install
+bun install
 ```
 
 ### Commandes principales
 
 ```bash
 # Workflow complet (mode séquentiel recommandé)
-npm run dev
+bun run dev
 
 # Test sur un seul joueur
-npm run test-player [nom_joueur]
+bun run test-player [nom_joueur]
 
 # Traitement d'une liste personnalisée
-npm run run-players Joueur1 Joueur2 Joueur3
+bun run run-players Joueur1 Joueur2 Joueur3
 
 # Mode calibration des coordonnées
-npm run calibration
+bun run calibration
 
 # Outil de calibration interactif
-npm run calibrate
+bun run calibrate
+
+# Calibration des cartes joueurs
+bun run calibrate-cards
+
+# Calibration des paramètres OCR
+bun run calibrate-ocr
+
+# Lancer les tests unitaires
+bun test
 ```
 
 ### Configuration requise
@@ -66,16 +75,18 @@ ui: {
 
 - **`GameNavigationService`**: Orchestration du workflow complet
 - **`ScreenCapture`**: Capture d'écran avec @nut-tree-fork/nut-js
-- **`OCRService`**: Traitement d'images via Tesseract.js (simulation actuelle)
+- **`OCREngine`**: Wrapper bas niveau Tesseract.js (reconnaissance de texte)
+- **`MonumentOCRParser`**: Analyse OCR spécialisée pour les monuments
+- **`PlayerNameExtractor`**: Extraction OCR des noms de joueurs
 - **`OpportunityDetector`**: Analyse des opportunités d'investissement
 - **`AutomationService`**: Mouvements de souris humains avec courbes de Bézier
 
 ### Flux de données
 
 ```
-ScreenCapture → OCRService → OpportunityDetector → GameNavigationService
-       ↑                                               ↓
-AutomationService ←── Config ←── Types ←── Logger
+ScreenCapture → OCREngine → MonumentOCRParser  → OpportunityDetector → GameNavigationService
+                         → PlayerNameExtractor                              ↓
+AutomationService ←────────── Config ←── Types ←── Logger
 ```
 
 ## ⚙️ Configuration
@@ -119,13 +130,21 @@ src/
 │   ├── monument-processing-service.ts # Traitement des monuments
 │   ├── reward-extraction-service.ts  # Extraction des récompenses
 │   ├── screen-capture.ts            # Capture d'écran
-│   ├── ocr-service.ts               # Service OCR (Tesseract)
+│   ├── ocr-engine.ts                # Wrapper bas niveau Tesseract.js
+│   ├── monument-ocr-parser.ts       # Analyse OCR spécialisée monuments
+│   ├── player-name-extractor.ts     # Extraction OCR noms de joueurs
 │   ├── ocr-enhancement.ts           # Correction OCR monuments
 │   ├── opportunity-detector.ts      # Détection d'opportunités
-│   └── automation-service.ts        # Automatisation souris/clavier
+│   ├── automation-service.ts        # Automatisation souris/clavier
+│   └── __tests__/
+│       ├── monument-processing.test.ts  # Tests traitement monuments
+│       ├── opportunity-detector.test.ts # Tests détection opportunités
+│       └── reward-extraction.test.ts    # Tests extraction récompenses
 ├── utils/
 │   ├── logger.ts              # Logging avec couleurs
-│   └── button-utils.ts        # Utilitaires boutons et clics
+│   ├── button-utils.ts        # Utilitaires boutons et clics
+│   └── __tests__/
+│       └── button-utils.test.ts # Tests utilitaires boutons
 ├── scripts/
 │   ├── test-implementation.ts # Test filtrage et exclusion
 │   ├── test-monument-ocr.ts   # Test extraction OCR monuments
@@ -150,6 +169,23 @@ Consultez les guides dans le dossier `docs/` :
 - [PLAYER_MODES.md](./docs/PLAYER_MODES.md) — Modes de traitement des joueurs
 - [PAGINATION.md](./docs/PAGINATION.md) — Gestion de la pagination
 - [CALIBRATION_FIX.md](./docs/CALIBRATION_FIX.md) — Résolution de problèmes de calibration
+- [CALIBRATION_CARTES.md](./docs/CALIBRATION_CARTES.md) — Calibration des cartes joueurs
+- [CLICS_NATURELS.md](./docs/CLICS_NATURELS.md) — Système de clics naturels
+- [MONUMENT_FILTERING.md](./docs/MONUMENT_FILTERING.md) — Filtrage des monuments
+
+## 🧪 Tests
+
+Les tests utilisent le test runner intégré de **Bun** :
+
+```bash
+bun test
+```
+
+Fichiers de test :
+- `src/modules/__tests__/monument-processing.test.ts` — Traitement des monuments
+- `src/modules/__tests__/opportunity-detector.test.ts` — Détection d'opportunités
+- `src/modules/__tests__/reward-extraction.test.ts` — Extraction des récompenses
+- `src/utils/__tests__/button-utils.test.ts` — Utilitaires boutons et clics
 
 ## 🛠️ Configuration
 
