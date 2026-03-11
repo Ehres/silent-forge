@@ -258,16 +258,18 @@ export class PlayerNavigationService {
       }
 
       // TODO: Utiliser OCR pour extraire les noms des joueurs
-      // Pour l'instant, retourner une liste simulée
-      const simulatedPlayers = [
-        `SimulatedPlayer${Math.floor(Math.random() * 1000)}`,
-        `SimulatedPlayer${Math.floor(Math.random() * 1000)}`,
-        `SimulatedPlayer${Math.floor(Math.random() * 1000)}`,
-        `SimulatedPlayer${Math.floor(Math.random() * 1000)}`,
-        `SimulatedPlayer${Math.floor(Math.random() * 1000)}`,
-      ];
+      if (this.config.debug.simulateData) {
+        this.logger.warn('⚠️ Mode simulation activé — données joueurs fictives');
+        return [
+          `SimulatedPlayer${Math.floor(Math.random() * 1000)}`,
+          `SimulatedPlayer${Math.floor(Math.random() * 1000)}`,
+          `SimulatedPlayer${Math.floor(Math.random() * 1000)}`,
+          `SimulatedPlayer${Math.floor(Math.random() * 1000)}`,
+          `SimulatedPlayer${Math.floor(Math.random() * 1000)}`,
+        ];
+      }
 
-      return simulatedPlayers;
+      return [];
     } catch (error) {
       this.logger.error(
         "❌ Erreur lors de l'extraction des joueurs:",
@@ -291,7 +293,14 @@ export class PlayerNavigationService {
       );
 
       await this.automationService.randomDelay(1000, 2000);
-      return true; // Simuler qu'il y a toujours une page suivante pour les tests
+
+      if (this.config.debug.simulateData) {
+        this.logger.warn('⚠️ Mode simulation — page suivante toujours disponible');
+        return true;
+      }
+
+      // TODO: Vérifier visuellement si le bouton "Suivant" existe
+      return true;
     } catch (error) {
       this.logger.debug('📄 Pas de page suivante disponible');
       return false;
@@ -580,7 +589,7 @@ export class PlayerNavigationService {
           const fs = await import('fs');
           await fs.promises.unlink(imagePath);
         } catch (error) {
-          // Ignorer les erreurs de suppression
+          this.logger.debug('Suppression fichier temporaire échouée:', error);
         }
 
         this.logger.debug(

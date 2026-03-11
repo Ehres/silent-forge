@@ -337,7 +337,7 @@ export class MonumentProcessingService {
         await fs.promises.unlink(imagePath);
         this.logger.debug('🗑️ Fichier temporaire supprimé');
       } catch (error) {
-        // Ignorer les erreurs de suppression
+        this.logger.debug('Suppression fichier temporaire échouée:', error);
       }
     }
 

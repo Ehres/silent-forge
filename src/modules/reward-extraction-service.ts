@@ -57,7 +57,7 @@ export class RewardExtractionService {
           await fs.promises.unlink(tooltipImagePath);
           this.logger.debug('🗑️ Fichier tooltip temporaire supprimé');
         } catch (error) {
-          // Ignorer les erreurs de suppression
+          this.logger.debug('Suppression fichier tooltip échouée:', error);
         }
       }
 

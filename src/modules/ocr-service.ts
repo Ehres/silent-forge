@@ -629,8 +629,8 @@ export class OCRService {
     try {
       // Si pas de screenshot (mode test), retourner données simulées
       if (!screenshot) {
-        this.logger.debug(
-          '⚠️ Pas de screenshot fourni - utilisation des données simulées'
+        this.logger.warn(
+          '⚠️ Pas de screenshot fourni — utilisation des données simulées'
         );
         return this.getSimulatedMonumentData();
       }
@@ -681,7 +681,7 @@ export class OCRService {
       );
 
       // Fallback vers les données simulées en cas d'erreur OCR
-      this.logger.warn('⚠️ Utilisation des données simulées en fallback');
+      this.logger.warn('⚠️ Fallback données simulées suite à erreur OCR');
       return this.getSimulatedMonumentData();
     }
   }

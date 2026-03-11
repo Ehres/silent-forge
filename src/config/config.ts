@@ -72,6 +72,7 @@ export interface Config {
   debug: {
     saveCaptures: boolean;
     logLevel: 'debug' | 'info' | 'warn' | 'error';
+    simulateData: boolean;
   };
 
   // Configuration d'automatisation
@@ -208,6 +209,7 @@ export const defaultConfig: Config = {
   debug: {
     saveCaptures: true,
     logLevel: 'info',
+    simulateData: false,
   },
   automation: {
     enabled: true,
