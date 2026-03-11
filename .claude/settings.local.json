@@ -5,7 +5,12 @@
       "Bash(npx tsc:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(npx jest:*)"
+      "Bash(npx jest:*)",
+      "Bash(node -v 2>/dev/null; bun -v 2>/dev/null || echo \"bun not installed\")",
+      "Bash(bun install:*)",
+      "Bash(bun remove:*)",
+      "Bash(bun test:*)",
+      "Bash(bun run:*)"
     ]
   }
 }
