@@ -1,6 +1,7 @@
+import { describe, it, expect } from 'bun:test';
 import { MonumentProcessingService } from '../monument-processing-service';
 import { RewardExtractionService } from '../reward-extraction-service';
-import { MonumentTableRow } from '../../types';
+import { MonumentTableRow } from '../../types/index';
 
 // Access the public filterTargetMonuments method
 function createService(): MonumentProcessingService {

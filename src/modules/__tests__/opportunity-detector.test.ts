@@ -1,5 +1,6 @@
+import { describe, it, expect } from 'bun:test';
 import { OpportunityDetector } from '../opportunity-detector';
-import { MonumentData } from '../../types';
+import { MonumentData } from '../../types/index';
 
 function makeMonument(
   places: Array<{ position: number; cost: number; return: number }>

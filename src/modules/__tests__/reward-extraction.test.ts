@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'bun:test';
 import { RewardExtractionService } from '../reward-extraction-service';
 
 describe('RewardExtractionService.parseRewardsFromTooltip', () => {
