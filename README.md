@@ -25,7 +25,7 @@ npm install
 ### Commandes principales
 
 ```bash
-# Workflow complet avec joueurs par défaut
+# Workflow complet (mode séquentiel recommandé)
 npm run dev
 
 # Test sur un seul joueur
@@ -39,10 +39,6 @@ npm run calibration
 
 # Outil de calibration interactif
 npm run calibrate
-
-# Scripts de test modulaires
-npm run test-modules
-npm run example
 ```
 
 ### Configuration requise
@@ -111,20 +107,31 @@ automation: {
 
 ```
 src/
-├── index.ts              # Point d'entrée principal
-├── example.ts            # Exemple d'utilisation détaillée
-├── test.ts               # Script de test et validation
+├── main.ts                    # Point d'entrée principal (CLI)
+├── calibrate.ts               # Calibration interactive
+├── calibrate-cards.ts         # Calibration des cartes joueurs
+├── calibrate-ocr.ts           # Calibration des paramètres OCR
 ├── types/
-│   └── index.ts          # Types TypeScript
+│   └── index.ts               # Types TypeScript partagés
 ├── modules/
-│   ├── screen-capture.ts      # Service de capture d'écran
-│   ├── ocr-service.ts         # Service OCR avec Tesseract
-│   ├── opportunity-detector.ts # Détection d'opportunités
-│   └── automation-service.ts   # Automatisation des clics/mouvements
+│   ├── game-navigation-service.ts   # Orchestration du workflow
+│   ├── player-navigation-service.ts # Navigation et pagination joueurs
+│   ├── monument-processing-service.ts # Traitement des monuments
+│   ├── reward-extraction-service.ts  # Extraction des récompenses
+│   ├── screen-capture.ts            # Capture d'écran
+│   ├── ocr-service.ts               # Service OCR (Tesseract)
+│   ├── ocr-enhancement.ts           # Correction OCR monuments
+│   ├── opportunity-detector.ts      # Détection d'opportunités
+│   └── automation-service.ts        # Automatisation souris/clavier
 ├── utils/
-│   └── logger.ts         # Service de logging avec couleurs
+│   ├── logger.ts              # Logging avec couleurs
+│   └── button-utils.ts        # Utilitaires boutons et clics
+├── scripts/
+│   ├── test-implementation.ts # Test filtrage et exclusion
+│   ├── test-monument-ocr.ts   # Test extraction OCR monuments
+│   └── test-sequential-rewards.ts # Test récompenses séquentielles
 └── config/
-    └── config.ts         # Configuration du projet
+    └── config.ts              # Configuration centralisée
 ```
 
 ## 🧪 Étapes de MVP (Produit minimal viable)
@@ -136,7 +143,13 @@ src/
 
 ## 📖 Documentation
 
-Consultez [GETTING_STARTED.md](./GETTING_STARTED.md) pour un guide détaillé de configuration et d'utilisation.
+Consultez les guides dans le dossier `docs/` :
+
+- [GETTING_STARTED.md](./docs/GETTING_STARTED.md) — Guide de démarrage et configuration initiale
+- [IMPLEMENTATION_GUIDE.md](./docs/IMPLEMENTATION_GUIDE.md) — Guide d'implémentation technique
+- [PLAYER_MODES.md](./docs/PLAYER_MODES.md) — Modes de traitement des joueurs
+- [PAGINATION.md](./docs/PAGINATION.md) — Gestion de la pagination
+- [CALIBRATION_FIX.md](./docs/CALIBRATION_FIX.md) — Résolution de problèmes de calibration
 
 ## 🛠️ Configuration
 
