@@ -207,6 +207,63 @@ export interface UIRegions {
 }
 
 /**
+ * Représente un monument avec investissement
+ */
+export interface InvestedMonument {
+  name: string;
+  hasInvestments: boolean;
+  position: { x: number; y: number; width: number; height: number };
+}
+
+/**
+ * Représente un monument détecté via OCR dans le tableau
+ */
+export interface MonumentTableRow {
+  name: string;
+  level: number;
+  progression: {
+    current: number;
+    maximum: number;
+  };
+  myInvestment: number | null;
+  myRank: number | null;
+  activityButtonPosition: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+}
+
+/**
+ * Représente un monument ciblé (investissements existants mais pas les miens)
+ */
+export interface TargetMonument {
+  name: string;
+  level: number;
+  progression: {
+    current: number;
+    maximum: number;
+  };
+  hasOthersInvestments: boolean;
+  hasMyInvestments: boolean;
+  activityButtonPosition: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+}
+
+/**
+ * Représente un joueur avec ses monuments
+ */
+export interface Player {
+  name: string;
+  monuments: InvestedMonument[];
+}
+
+/**
  * Résultat d'un traitement de joueur
  */
 export interface PlayerProcessingResult {
