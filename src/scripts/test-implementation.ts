@@ -4,7 +4,7 @@
  */
 
 import { GameNavigationService } from '../modules/game-navigation-service';
-import { OCRService } from '../modules/ocr-service';
+import { MonumentOCRParser } from '../modules/monument-ocr-parser';
 import { Logger } from '../utils/logger';
 import { loadConfig } from '../config/config';
 
@@ -28,7 +28,7 @@ async function testNewImplementation() {
 
   // Test 2: Test de l'analyse OCR avec propriétaire
   logger.info("\n2️⃣ Test de l'analyse OCR avec propriétaire:");
-  const ocrService = new OCRService();
+  const ocrService = new MonumentOCRParser();
 
   try {
     // Test avec une image simulée (null pour déclencher les données de test)

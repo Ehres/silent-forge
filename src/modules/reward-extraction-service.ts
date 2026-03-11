@@ -1,6 +1,6 @@
 import { AutomationService } from './automation-service';
 import { ScreenCapture } from './screen-capture';
-import { OCRService } from './ocr-service';
+import { OCREngine } from './ocr-engine';
 import { Logger } from '../utils/logger';
 import { Config, loadConfig } from '../config/config';
 import { RewardItem } from '../types/index';
@@ -11,14 +11,14 @@ import { RewardItem } from '../types/index';
 export class RewardExtractionService {
   private automationService: AutomationService;
   private screenCapture: ScreenCapture;
-  private ocrService: OCRService;
+  private ocrEngine: OCREngine;
   private logger: Logger;
   private config: Config;
 
   constructor() {
     this.automationService = new AutomationService();
     this.screenCapture = new ScreenCapture();
-    this.ocrService = new OCRService();
+    this.ocrEngine = new OCREngine();
     this.logger = new Logger();
     this.config = loadConfig();
   }
@@ -138,7 +138,7 @@ export class RewardExtractionService {
   ): Promise<RewardItem[]> {
     try {
       const ocrText =
-        await this.ocrService.extractTextFromTooltip(tooltipImagePath);
+        await this.ocrEngine.extractTextFromTooltip(tooltipImagePath);
       const rewards: RewardItem[] = [];
 
       // Pattern: "+100 Points Forge"

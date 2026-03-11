@@ -1,6 +1,6 @@
 import { AutomationService } from './automation-service';
 import { ScreenCapture } from './screen-capture';
-import { OCRService } from './ocr-service';
+import { PlayerNameExtractor } from './player-name-extractor';
 import { OCREnhancementService } from './ocr-enhancement';
 import { Logger } from '../utils/logger';
 import { Config, loadConfig } from '../config/config';
@@ -26,7 +26,7 @@ export type ProcessPlayerHandler = (
 export class PlayerNavigationService {
   private automationService: AutomationService;
   private screenCapture: ScreenCapture;
-  private ocrService: OCRService;
+  private playerNameExtractor: PlayerNameExtractor;
   private ocrEnhancement: OCREnhancementService;
   private logger: Logger;
   private config: Config;
@@ -36,7 +36,7 @@ export class PlayerNavigationService {
   constructor(processPlayerHandler: ProcessPlayerHandler) {
     this.automationService = new AutomationService();
     this.screenCapture = new ScreenCapture();
-    this.ocrService = new OCRService();
+    this.playerNameExtractor = new PlayerNameExtractor();
     this.ocrEnhancement = new OCREnhancementService();
     this.logger = new Logger();
     this.config = loadConfig();
@@ -555,7 +555,7 @@ export class PlayerNavigationService {
 
         // Extraire tous les noms via OCR en utilisant le service dédié
         const playerNames =
-          await this.ocrService.extractPlayerNamesFromImage(
+          await this.playerNameExtractor.extractPlayerNamesFromImage(
             imagePath,
             playersPerPage
           );
@@ -579,7 +579,7 @@ export class PlayerNavigationService {
 
         // Extraire les noms via OCR en utilisant le service dédié
         const playerNames =
-          await this.ocrService.extractPlayerNamesFromImage(
+          await this.playerNameExtractor.extractPlayerNamesFromImage(
             imagePath,
             playersPerPage
           );

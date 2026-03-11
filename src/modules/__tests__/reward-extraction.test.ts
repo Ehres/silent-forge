@@ -11,8 +11,8 @@ describe('RewardExtractionService.parseRewardsFromTooltip', () => {
 
   it('parses forge points from tooltip text', async () => {
     // Mock the ocrService.extractTextFromTooltip to return known text
-    const originalExtract = (service as any).ocrService.extractTextFromTooltip;
-    (service as any).ocrService.extractTextFromTooltip = async () =>
+    const originalExtract = (service as any).ocrEngine.extractTextFromTooltip;
+    (service as any).ocrEngine.extractTextFromTooltip = async () =>
       '+100 Points Forge';
 
     const rewards = await service.parseRewardsFromTooltip('dummy-path.png');
@@ -22,11 +22,11 @@ describe('RewardExtractionService.parseRewardsFromTooltip', () => {
     expect(rewards[0].quantity).toBe(100);
 
     // Restore
-    (service as any).ocrService.extractTextFromTooltip = originalExtract;
+    (service as any).ocrEngine.extractTextFromTooltip = originalExtract;
   });
 
   it('parses medals from tooltip text', async () => {
-    (service as any).ocrService.extractTextFromTooltip = async () =>
+    (service as any).ocrEngine.extractTextFromTooltip = async () =>
       '+50 Médailles';
 
     const rewards = await service.parseRewardsFromTooltip('dummy-path.png');
@@ -37,7 +37,7 @@ describe('RewardExtractionService.parseRewardsFromTooltip', () => {
   });
 
   it('parses blueprints from tooltip text', async () => {
-    (service as any).ocrService.extractTextFromTooltip = async () =>
+    (service as any).ocrEngine.extractTextFromTooltip = async () =>
       '+10 Plans';
 
     const rewards = await service.parseRewardsFromTooltip('dummy-path.png');
@@ -48,7 +48,7 @@ describe('RewardExtractionService.parseRewardsFromTooltip', () => {
   });
 
   it('parses multiple reward types', async () => {
-    (service as any).ocrService.extractTextFromTooltip = async () =>
+    (service as any).ocrEngine.extractTextFromTooltip = async () =>
       '+200 Points Forge\n+30 Médailles\n+5 Plans';
 
     const rewards = await service.parseRewardsFromTooltip('dummy-path.png');
@@ -62,7 +62,7 @@ describe('RewardExtractionService.parseRewardsFromTooltip', () => {
   });
 
   it('returns empty for unrecognized text', async () => {
-    (service as any).ocrService.extractTextFromTooltip = async () =>
+    (service as any).ocrEngine.extractTextFromTooltip = async () =>
       'random garbage text';
 
     const rewards = await service.parseRewardsFromTooltip('dummy-path.png');

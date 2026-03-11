@@ -1,9 +1,9 @@
-import { OCRService } from '../modules/ocr-service';
+import { MonumentOCRParser } from '../modules/monument-ocr-parser';
 import { Logger } from '../utils/logger';
 import path from 'path';
 
 async function testMonumentOCR() {
-  const ocrService = new OCRService();
+  const ocrService = new MonumentOCRParser();
   const logger = new Logger();
 
   logger.info("🧪 Test de l'analyse OCR de tableau de monument...");

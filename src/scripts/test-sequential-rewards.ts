@@ -1,4 +1,4 @@
-import { OCRService } from '../modules/ocr-service';
+import { MonumentOCRParser } from '../modules/monument-ocr-parser';
 import { Logger } from '../utils/logger';
 import path from 'path';
 
@@ -6,7 +6,7 @@ import path from 'path';
  * Test de l'extraction séquentielle des récompenses
  */
 async function testSequentialRewardsExtraction() {
-  const ocrService = new OCRService();
+  const ocrService = new MonumentOCRParser();
   const logger = new Logger();
 
   logger.info("🧪 Test de l'extraction sequentielle des recompenses...");

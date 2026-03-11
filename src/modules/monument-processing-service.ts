@@ -1,6 +1,6 @@
 import { AutomationService } from './automation-service';
 import { ScreenCapture } from './screen-capture';
-import { OCRService } from './ocr-service';
+import { MonumentOCRParser } from './monument-ocr-parser';
 import { OpportunityDetector } from './opportunity-detector';
 import { OCREnhancementService } from './ocr-enhancement';
 import { RewardExtractionService } from './reward-extraction-service';
@@ -25,7 +25,7 @@ import {
 export class MonumentProcessingService {
   private automationService: AutomationService;
   private screenCapture: ScreenCapture;
-  private ocrService: OCRService;
+  private ocrParser: MonumentOCRParser;
   private opportunityDetector: OpportunityDetector;
   private ocrEnhancement: OCREnhancementService;
   private rewardExtractor: RewardExtractionService;
@@ -36,7 +36,7 @@ export class MonumentProcessingService {
   constructor(rewardExtractor: RewardExtractionService) {
     this.automationService = new AutomationService();
     this.screenCapture = new ScreenCapture();
-    this.ocrService = new OCRService();
+    this.ocrParser = new MonumentOCRParser();
     this.opportunityDetector = new OpportunityDetector();
     this.ocrEnhancement = new OCREnhancementService();
     this.rewardExtractor = rewardExtractor;
@@ -166,7 +166,7 @@ export class MonumentProcessingService {
       }
 
       // Extraire les données du tableau via OCR (utiliser le fichier plutôt que l'objet)
-      const tableData = await this.ocrService.extractMonumentTableData(
+      const tableData = await this.ocrParser.extractMonumentTableData(
         imagePath || screenshot
       );
 
@@ -277,7 +277,7 @@ export class MonumentProcessingService {
     this.logger.debug(`📁 Image sauvegardée pour OCR: ${imagePath}`);
 
     // Analyser avec OCR en passant le chemin de l'image et le nom du propriétaire
-    const monumentData = await this.ocrService.analyzeMonument(
+    const monumentData = await this.ocrParser.analyzeMonument(
       imagePath,
       ownerName
     );
@@ -463,7 +463,7 @@ export class MonumentProcessingService {
 
       // Extraire les données (utilisera les données simulées)
       const tableData =
-        await this.ocrService.extractMonumentTableData(mockScreenshot);
+        await this.ocrParser.extractMonumentTableData(mockScreenshot);
 
       this.logger.info(
         `📊 ${tableData.length} monument(s) extraits du tableau:`
