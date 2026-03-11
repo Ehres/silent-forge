@@ -1,5 +1,5 @@
-import { OCRService } from './modules/ocr-service';
-import { Logger } from './utils/logger';
+import { OCRService } from '../modules/ocr-service';
+import { Logger } from '../utils/logger';
 import path from 'path';
 
 async function testMonumentOCR() {

@@ -3,10 +3,10 @@
  * Test d'intégration pour les nouvelles fonctionnalités
  */
 
-import { GameNavigationService } from './modules/game-navigation-service';
-import { OCRService } from './modules/ocr-service';
-import { Logger } from './utils/logger';
-import { loadConfig } from './config/config';
+import { GameNavigationService } from '../modules/game-navigation-service';
+import { OCRService } from '../modules/ocr-service';
+import { Logger } from '../utils/logger';
+import { loadConfig } from '../config/config';
 
 async function testNewImplementation() {
   const logger = new Logger();
