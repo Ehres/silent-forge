@@ -1,3 +1,5 @@
+import { Logger } from '../utils/logger';
+
 /**
  * Base de connaissances des monuments et système de correction OCR
  */
@@ -583,14 +585,23 @@ export const MONUMENTS_DATABASE: Record<string, MonumentInfo> = {
   },
 };
 
+interface RawOCRRow {
+  name: string;
+  level: number;
+  progression: { current: number; maximum: number };
+  [key: string]: unknown;
+}
+
 /**
  * Service de correction et amélioration OCR
  */
 export class OCREnhancementService {
   private monuments: Record<string, MonumentInfo>;
+  private logger: Logger;
 
   constructor() {
     this.monuments = MONUMENTS_DATABASE;
+    this.logger = new Logger();
   }
 
   /**
@@ -680,8 +691,8 @@ export class OCREnhancementService {
     // Valider la cohérence niveau/monument
     if (!this.validateMonumentLevel(correctedName, correctedLevel)) {
       // Log pour debug mais on garde les données
-      console.warn(
-        `⚠️ Niveau incohérent: ${correctedName} niveau ${correctedLevel}`
+      this.logger.warn(
+        `Niveau incohérent: ${correctedName} niveau ${correctedLevel}`
       );
     }
 
@@ -695,7 +706,7 @@ export class OCREnhancementService {
   /**
    * Améliore les données extraites par OCR
    */
-  enhanceOCRData(rawData: any[]): any[] {
+  enhanceOCRData(rawData: RawOCRRow[]): (RawOCRRow & { originalName: string; wasCorreted: boolean })[] {
     return rawData.map((row) => {
       const correctedName = this.correctMonumentName(row.name);
       const correctedLevel = this.correctLevel(row.level);
@@ -746,7 +757,7 @@ export class OCREnhancementService {
   /**
    * Analyse la qualité de l'extraction OCR
    */
-  analyzeOCRQuality(extractedData: any[]): {
+  analyzeOCRQuality(extractedData: RawOCRRow[]): {
     quality: 'excellent' | 'good' | 'fair' | 'poor';
     score: number;
     issues: string[];

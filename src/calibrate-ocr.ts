@@ -1,5 +1,7 @@
 #!/usr/bin/env ts-node
 
+import { Image } from '@nut-tree-fork/nut-js';
+import Tesseract from 'tesseract.js';
 import { ScreenCapture } from './modules/screen-capture';
 import { Logger } from './utils/logger';
 import { loadConfig } from './config/config';
@@ -127,8 +129,8 @@ async function calibrateOCRParameters(): Promise<void> {
       try {
         const startTime = Date.now();
 
-        // Test OCR avec cette configuration
-        const ocrResult = await testOCRWithConfig(screenshot, testConfig);
+        // Test OCR avec cette configuration (cast needed: nut-js Image → Tesseract ImageLike)
+        const ocrResult = await testOCRWithConfig(screenshot as unknown as Tesseract.ImageLike, testConfig);
 
         const processingTime = Date.now() - startTime;
 
@@ -228,15 +230,15 @@ async function calibrateOCRParameters(): Promise<void> {
  * Teste l'OCR avec une configuration spécifique
  */
 async function testOCRWithConfig(
-  screenshot: any,
+  screenshot: Tesseract.ImageLike,
   config: OCRTestConfig
-): Promise<any> {
+): Promise<{ text: string; confidence: number; words: Tesseract.Word[] }> {
   const { createWorker, PSM } = await import('tesseract.js');
 
   const worker = await createWorker(config.lang);
 
   // Mapper le mode de segmentation
-  let psmMode: any;
+  let psmMode: Tesseract.PSM;
   switch (config.options.tessedit_pageseg_mode) {
     case 6:
       psmMode = PSM.SINGLE_BLOCK;
@@ -313,7 +315,7 @@ function countFoundMonuments(text: string): number {
 /**
  * Sauvegarde les résultats texte de la meilleure configuration
  */
-async function saveTextResults(result: any, timestamp: string): Promise<void> {
+async function saveTextResults(result: { config: OCRTestConfig; extractedText: string; monumentsFound: number; confidence: number; processingTime: number }, timestamp: string): Promise<void> {
   const fs = await import('fs/promises');
   const path = await import('path');
 

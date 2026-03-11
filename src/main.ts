@@ -1,6 +1,6 @@
 import { GameNavigationService } from './modules/game-navigation-service';
 import { Logger } from './utils/logger';
-import { loadConfig } from './config/config';
+import { Config, loadConfig } from './config/config';
 
 /**
  * Point d'entrée principal de Silent Forge avec workflow complet
@@ -8,11 +8,11 @@ import { loadConfig } from './config/config';
 class SilentForgeMain {
   private gameNavigationService: GameNavigationService;
   private logger: Logger;
-  private config: any;
+  private config: Config;
 
-  constructor() {
+  constructor(configOverrides?: Partial<Config>) {
     this.logger = new Logger();
-    this.config = loadConfig();
+    this.config = { ...loadConfig(), ...configOverrides };
     this.gameNavigationService = new GameNavigationService();
   }
 
@@ -168,73 +168,69 @@ class SilentForgeMain {
 
 // Point d'entrée avec gestion des arguments
 async function main(): Promise<void> {
+  const logger = new Logger();
   const args = process.argv.slice(2);
   const mode = args[0] || 'sequential';
 
-  const silentForge = new SilentForgeMain();
-
   switch (mode) {
-    case 'test':
+    case 'test': {
+      const silentForge = new SilentForgeMain();
       const playerName = args[1] || 'TestPlayer';
       await silentForge.testSinglePlayer(playerName);
       break;
+    }
 
-    case 'calibration':
+    case 'calibration': {
+      const silentForge = new SilentForgeMain();
       await silentForge.calibrationMode();
       break;
+    }
 
-    case 'players':
-      // Mode avec liste de joueurs spécifique
+    case 'players': {
+      const silentForge = new SilentForgeMain();
       const customPlayers = args.slice(1);
       await silentForge.start(customPlayers);
       break;
+    }
 
-    case 'scan':
-      // Mode scan automatique avec OCR
-      console.log('🔍 Mode scan automatique avec OCR activé');
-      // Forcer le mode scan en modifiant temporairement la config
-      const config = silentForge['config'];
-      config.players.scanAllPlayers = true;
+    case 'scan': {
+      logger.info('Mode scan automatique avec OCR activé');
+      const silentForge = new SilentForgeMain({
+        players: { ...loadConfig().players, scanAllPlayers: true },
+      });
       await silentForge.start();
       break;
+    }
 
-    case 'sequential':
-      // Mode séquentiel recommandé (sans OCR des noms)
-      console.log('🔄 Mode séquentiel activé (recommandé)');
-      await silentForge.start(); // Mode par défaut
+    case 'sequential': {
+      logger.info('Mode séquentiel activé (recommandé)');
+      const silentForge = new SilentForgeMain();
+      await silentForge.start();
       break;
+    }
 
     case 'help':
-      console.log('📋 Modes disponibles:');
-      console.log(
-        '  npm run dev                           # Mode séquentiel (recommandé)'
-      );
-      console.log(
-        '  npm run dev -- sequential             # Mode séquentiel (recommandé)'
-      );
-      console.log(
-        '  npm run dev -- scan                   # Mode scan avec OCR'
-      );
-      console.log(
-        '  npm run dev -- players Joueur1 Joueur2 # Liste spécifique'
-      );
-      console.log(
-        '  npm run dev -- test JoueurTest        # Test un seul joueur'
-      );
-      console.log('  npm run dev -- calibration            # Mode calibration');
-      console.log('  npm run dev -- help                   # Cette aide');
-      console.log('');
-      console.log('💡 Mode séquentiel recommandé:');
-      console.log('  • Plus fiable (pas de dépendance OCR noms)');
-      console.log('  • Traite les joueurs par position relative');
-      console.log('  • Gestion automatique de la pagination');
+      logger.info('Modes disponibles:');
+      logger.info('  npm run dev                           # Mode séquentiel (recommandé)');
+      logger.info('  npm run dev -- sequential             # Mode séquentiel (recommandé)');
+      logger.info('  npm run dev -- scan                   # Mode scan avec OCR');
+      logger.info('  npm run dev -- players Joueur1 Joueur2 # Liste spécifique');
+      logger.info('  npm run dev -- test JoueurTest        # Test un seul joueur');
+      logger.info('  npm run dev -- calibration            # Mode calibration');
+      logger.info('  npm run dev -- help                   # Cette aide');
+      logger.info('');
+      logger.info('Mode séquentiel recommandé:');
+      logger.info('  - Plus fiable (pas de dépendance OCR noms)');
+      logger.info('  - Traite les joueurs par position relative');
+      logger.info('  - Gestion automatique de la pagination');
       break;
 
     case 'normal':
-    default:
-      // Par défaut, utiliser le mode séquentiel
+    default: {
+      const silentForge = new SilentForgeMain();
       await silentForge.start();
       break;
+    }
   }
 }
 

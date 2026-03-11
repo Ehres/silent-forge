@@ -218,6 +218,7 @@ class CalibrationHelper {
 
 // Interface CLI
 async function main(): Promise<void> {
+  const cliLogger = new Logger();
   const args = process.argv.slice(2);
   const command = args[0] || 'interactive';
 
@@ -228,28 +229,28 @@ async function main(): Promise<void> {
       await calibrator.captureFullScreen();
       break;
 
-    case 'region':
+    case 'region': {
       const x = parseInt(args[1]) || 100;
       const y = parseInt(args[2]) || 100;
-      const width = parseInt(args[3]) || 200; // Taille par défaut plus grande
-      const height = parseInt(args[4]) || 200; // Taille par défaut plus grande
+      const width = parseInt(args[3]) || 200;
+      const height = parseInt(args[4]) || 200;
 
       if (isNaN(x) || isNaN(y) || isNaN(width) || isNaN(height)) {
-        console.log('❌ Erreur: Coordonnées invalides');
-        console.log('💡 Usage: npm run calibrate -- region x y width height');
-        console.log('📋 Exemple: npm run calibrate -- region 813 948 200 200');
+        cliLogger.error('Coordonnées invalides');
+        cliLogger.info('Usage: npm run calibrate -- region x y width height');
+        cliLogger.info('Exemple: npm run calibrate -- region 813 948 200 200');
         return;
       }
 
       await calibrator.testRegionCapture(x, y, width, height);
       break;
+    }
 
     case 'sequence':
       await calibrator.captureSequence();
       break;
 
-    case 'test':
-      // Test avec la config actuelle
+    case 'test': {
       const { loadConfig } = await import('./config/config');
       const config = loadConfig();
       await calibrator.testRegionCapture(
@@ -259,43 +260,26 @@ async function main(): Promise<void> {
         config.capture.monumentRegion.height
       );
       break;
+    }
 
     case 'help':
-      console.log('📋 Commandes disponibles:');
-      console.log(
-        '  npm run calibrate                    # Guide interactif (défaut)'
-      );
-      console.log(
-        '  npm run calibrate -- full           # Capture plein écran'
-      );
-      console.log(
-        '  npm run calibrate -- region x y w h # Capture région spécifique'
-      );
-      console.log(
-        '  npm run calibrate -- sequence       # Capture plusieurs régions'
-      );
-      console.log(
-        '  npm run calibrate -- test           # Test config actuelle'
-      );
-      console.log('  npm run calibrate -- help           # Affiche cette aide');
-      console.log('');
-      console.log('💡 Exemples:');
-      console.log(
-        '  npm run calibrate -- region 813 948 200 200  # Capture bouton'
-      );
-      console.log(
-        '  npm run calibrate -- region 100 100 800 600  # Grande zone'
-      );
-      console.log(
-        '  npm run calibrate -- test                    # Test config'
-      );
-      console.log('');
-      console.log('⚠️ Notes importantes:');
-      console.log(
-        '  • Taille minimale: 50x50 pixels (auto-ajustée si plus petite)'
-      );
-      console.log('  • Les coordonnées doivent être positives');
-      console.log("  • Vérifiez que la région est dans les limites de l'écran");
+      cliLogger.info('Commandes disponibles:');
+      cliLogger.info('  npm run calibrate                    # Guide interactif (défaut)');
+      cliLogger.info('  npm run calibrate -- full           # Capture plein écran');
+      cliLogger.info('  npm run calibrate -- region x y w h # Capture région spécifique');
+      cliLogger.info('  npm run calibrate -- sequence       # Capture plusieurs régions');
+      cliLogger.info('  npm run calibrate -- test           # Test config actuelle');
+      cliLogger.info('  npm run calibrate -- help           # Affiche cette aide');
+      cliLogger.info('');
+      cliLogger.info('Exemples:');
+      cliLogger.info('  npm run calibrate -- region 813 948 200 200  # Capture bouton');
+      cliLogger.info('  npm run calibrate -- region 100 100 800 600  # Grande zone');
+      cliLogger.info('  npm run calibrate -- test                    # Test config');
+      cliLogger.info('');
+      cliLogger.info('Notes importantes:');
+      cliLogger.info('  - Taille minimale: 50x50 pixels (auto-ajustée si plus petite)');
+      cliLogger.info('  - Les coordonnées doivent être positives');
+      cliLogger.info("  - Vérifiez que la région est dans les limites de l'écran");
       break;
 
     case 'interactive':

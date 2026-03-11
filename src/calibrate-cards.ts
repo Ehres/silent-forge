@@ -7,7 +7,7 @@
 
 import { screen, Region } from '@nut-tree-fork/nut-js';
 import { Logger } from './utils/logger';
-import { loadConfig } from './config/config';
+import { Config, loadConfig } from './config/config';
 import { ScreenCapture } from './modules/screen-capture';
 
 const logger = new Logger();
@@ -75,7 +75,7 @@ async function capturePlayerCardsArea(): Promise<void> {
 /**
  * Affiche un guide pour mesurer les cartes
  */
-function displayMeasurementGuide(cardLayout: any): void {
+function displayMeasurementGuide(cardLayout: Config['players']['cardLayout']): void {
   logger.info('\n📐 GUIDE DE CALIBRATION DES CARTES');
   logger.info('═══════════════════════════════════');
   logger.info('');

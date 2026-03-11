@@ -98,6 +98,7 @@ export class ScreenCapture {
   /**
    * Convertit une image @nut-tree-fork/nut-js vers Jimp
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async createJimpFromNutImage(nutImage: Image): Promise<any> {
     const { width, height, data, channels } = nutImage;
 

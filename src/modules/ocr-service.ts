@@ -10,6 +10,12 @@ import {
 } from '../types';
 import { Logger } from '../utils/logger';
 
+interface OCRRecognizeData {
+  text: string;
+  confidence: number;
+  words: Array<{ text: string; confidence: number }>;
+}
+
 /**
  * Service OCR pour analyser les captures d'écran des Grands Monuments
  */
@@ -576,7 +582,7 @@ export class OCRService {
    * Extrait le texte depuis une image de tooltip via OCR
    * Configuration optimisée pour les tooltips avec récompenses
    */
-  async extractTextFromTooltip(tooltipImage: any): Promise<string> {
+  async extractTextFromTooltip(tooltipImage: string): Promise<string> {
     try {
       // Configuration OCR optimisée pour les tooltips
       const ocrConfig = {
@@ -616,7 +622,7 @@ export class OCRService {
    * Avec préparation d'image et parsing optimisé
    */
   async extractMonumentTableData(
-    screenshot: any
+    screenshot: string | Image | null
   ): Promise<ParsedMonumentTableRow[]> {
     this.logger.debug('📊 Extraction des données du tableau des monuments...');
 
@@ -683,7 +689,8 @@ export class OCRService {
   /**
    * Prépare l'image pour l'OCR en appliquant des prétraitements
    */
-  private async prepareImageForOCR(screenshot: any): Promise<any> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async prepareImageForOCR(screenshot: string | Image | Buffer): Promise<any> {
     this.logger.debug("🖼️ Préparation de l'image pour OCR...");
 
     try {
@@ -727,7 +734,7 @@ export class OCRService {
    * Parse le texte OCR brut en lignes de tableau structurées
    */
   private async parseOCRTextToTableRows(
-    ocrData: any
+    ocrData: OCRRecognizeData
   ): Promise<ParsedMonumentTableRow[]> {
     this.logger.debug('📝 Parsing du texte OCR en lignes de tableau...');
 
