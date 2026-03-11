@@ -9,19 +9,15 @@ import { Config, loadConfig } from '../config/config';
 import {
   MonumentData,
   Opportunity,
-  RewardItem,
   InvestedMonument,
   MonumentTableRow,
   TargetMonument,
-  Player,
-} from '../types';
+} from '../types/index';
 import {
   HumanClickSimulator,
   ButtonCoordinates,
 } from '../utils/button-utils';
 
-// Re-export for backward compatibility
-export { InvestedMonument, MonumentTableRow, TargetMonument, Player };
 
 /**
  * Service de traitement des monuments (ouverture, identification, analyse, investissement)

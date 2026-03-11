@@ -7,7 +7,7 @@ import {
   MonumentInvestmentData,
   PlayerInvestment,
   ParsedMonumentTableRow,
-} from '../types';
+} from '../types/index';
 import { Logger } from '../utils/logger';
 
 interface OCRRecognizeData {

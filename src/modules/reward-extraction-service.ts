@@ -3,7 +3,7 @@ import { ScreenCapture } from './screen-capture';
 import { OCRService } from './ocr-service';
 import { Logger } from '../utils/logger';
 import { Config, loadConfig } from '../config/config';
-import { RewardItem } from '../types';
+import { RewardItem } from '../types/index';
 
 /**
  * Service d'extraction des récompenses des monuments

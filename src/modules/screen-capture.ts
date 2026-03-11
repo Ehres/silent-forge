@@ -1,6 +1,6 @@
 import { screen, Region, Image } from '@nut-tree-fork/nut-js';
 import Jimp from 'jimp';
-import { CaptureConfig } from '../types';
+import { CaptureConfig } from '../types/index';
 import { Logger } from '../utils/logger';
 
 /**

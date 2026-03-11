@@ -1,16 +1,8 @@
 import { Logger } from '../utils/logger';
-import {
-  InvestedMonument,
-  MonumentTableRow,
-  TargetMonument,
-  Player,
-} from '../types';
 import { PlayerNavigationService } from './player-navigation-service';
 import { MonumentProcessingService } from './monument-processing-service';
 import { RewardExtractionService } from './reward-extraction-service';
 
-// Re-export interfaces for backward compatibility
-export { InvestedMonument, MonumentTableRow, TargetMonument, Player };
 
 /**
  * Façade orchestrant le workflow complet de navigation et traitement.

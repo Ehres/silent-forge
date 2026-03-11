@@ -1,4 +1,4 @@
-import { MonumentData, Opportunity } from '../types';
+import { MonumentData, Opportunity } from '../types/index';
 import { Logger } from '../utils/logger';
 
 /**
